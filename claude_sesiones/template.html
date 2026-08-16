@@ -1,6 +1,30 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="robots" content="noindex, nofollow">
 <title>Sesiones de Claude Code</title>
+
+<script>
+  // Corre antes del primer pintado para que el tema elegido no parpadee:
+  // primero la preferencia guardada, si no la del sistema.
+  (function () {
+    var saved = null;
+    try { saved = localStorage.getItem('cs-tema'); } catch (e) {}
+    var dark = saved ? saved === 'dark'
+                     : matchMedia('(prefers-color-scheme: dark)').matches;
+    document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  })();
+</script>
+
 <style>
-  :root {
+  /* Una paleta por tema y nada más: el data-theme lo pone el script de arriba
+     antes de pintar, así que no hace falta repetir los valores dentro de una
+     @media. El botón del toolbar cambia ese mismo atributo. */
+
+  :root, :root[data-theme="light"] {
     --ground:   #EDEEF2;
     --surface:  #FFFFFF;
     --raised:   #F6F7F9;
@@ -20,46 +44,6 @@
 
     --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     --mono: ui-monospace, "JetBrains Mono", "SFMono-Regular", "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
-  }
-
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --ground:   #0E1015;
-      --surface:  #171A21;
-      --raised:   #1D212A;
-      --ink:      #DFE2EA;
-      --ink-soft: #B4BAC7;
-      --muted:    #878DA0;
-      --faint:    #666C7D;
-      --line:     #262A34;
-      --line-soft:#1F232C;
-      --amber:    #E29A4A;
-      --amber-lo: #8A6435;
-      --amber-bg: rgba(226, 154, 74, 0.11);
-      --scrim:    rgba(0, 0, 0, .62);
-      --shadow:   0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.7);
-      --shadow-lg:0 24px 70px -20px rgba(0,0,0,.85);
-      --focus:    #6BA5F0;
-    }
-  }
-
-  :root[data-theme="light"] {
-    --ground:   #EDEEF2;
-    --surface:  #FFFFFF;
-    --raised:   #F6F7F9;
-    --ink:      #14161C;
-    --ink-soft: #3D4250;
-    --muted:    #6A6F7E;
-    --faint:    #9AA0AE;
-    --line:     #DCDEE5;
-    --line-soft:#E7E9EE;
-    --amber:    #A85A16;
-    --amber-lo: #C98A47;
-    --amber-bg: rgba(168, 90, 22, 0.09);
-    --scrim:    rgba(20, 22, 28, .38);
-    --shadow:   0 1px 2px rgba(20, 22, 28, .06), 0 8px 24px -12px rgba(20, 22, 28, .18);
-    --shadow-lg:0 24px 70px -20px rgba(20, 22, 28, .45);
-    --focus:    #2C6FD1;
   }
 
   :root[data-theme="dark"] {
@@ -220,6 +204,33 @@
   .toggle input { accent-color: var(--amber); margin: 0; }
   .toggle:hover { color: var(--ink); }
   .toggle:has(input:checked) { color: var(--amber); border-color: var(--amber-lo); background: var(--amber-bg); }
+
+  .tbtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 9px 11px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .tbtn:hover { color: var(--amber); border-color: var(--amber-lo); }
+  .tbtn .sun { display: none; }
+  :root[data-theme="dark"] .tbtn .sun { display: block; }
+  :root[data-theme="dark"] .tbtn .moon { display: none; }
+
+  .noscript {
+    margin: 0 0 24px;
+    padding: 14px 16px;
+    border: 1px solid var(--amber-lo);
+    background: var(--amber-bg);
+    border-radius: 10px;
+    color: var(--ink);
+    font-size: 14px;
+  }
 
   :is(input, select, button, .toggle, .row[tabindex]):focus-visible {
     outline: 2px solid var(--focus);
@@ -563,7 +574,9 @@
     * { transition: none !important; }
   }
 </style>
+</head>
 
+<body>
 <div class="wrap">
   <header class="masthead">
     <span class="eyebrow">~/.claude/projects</span>
@@ -571,16 +584,26 @@
     <p class="lede">Cada conversación queda en un <code>.jsonl</code> local. Hacé clic en cualquier fila para leerla, o copiá el comando para retomarla — el <code>--resume</code> solo encuentra la sesión desde su directorio original, así que el botón copia el <code>cd</code> también.</p>
   </header>
 
+  <noscript>
+    <p class="noscript">Esta página arma la lista con JavaScript. Con JavaScript
+    desactivado no se ve nada — los datos igual están adentro del archivo, en el
+    <code>&lt;script id="payload"&gt;</code>.</p>
+  </noscript>
+
   <div class="stats" id="stats"></div>
 
   <div class="toolbar">
     <div class="field">
       <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg>
-      <input type="search" id="q" placeholder="buscar título, ruta o uuid…" autocomplete="off" spellcheck="false" aria-label="Buscar sesiones">
+      <input type="search" id="q" placeholder="buscar título, ruta o uuid…  (/)" autocomplete="off" spellcheck="false" aria-label="Buscar sesiones">
     </div>
     <select id="proj" aria-label="Filtrar por proyecto"></select>
     <label class="toggle"><input type="checkbox" id="deep"> buscar dentro del chat</label>
     <label class="toggle"><input type="checkbox" id="hideEmpty"> ocultar vacías</label>
+    <button type="button" class="tbtn" id="theme" title="Cambiar entre claro y oscuro" aria-label="Cambiar tema">
+      <svg class="moon" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M13.5 9.6A5.8 5.8 0 0 1 6.4 2.5a5.8 5.8 0 1 0 7.1 7.1Z"/></svg>
+      <svg class="sun" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="3.1"/><path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/></svg>
+    </button>
   </div>
 
   <div class="grid" role="table" aria-label="Sesiones de Claude Code">
@@ -683,14 +706,18 @@ function stripeFor(iso) {
   return 'var(--line)';
 }
 
-const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
+// Resalta la primera coincidencia. La aguja se escapa igual que el pajar: si
+// no, buscar "&" o "<" nunca encontraría nada, porque en `s` ya son entidades.
 function mark(text, q) {
   const s = esc(text);
   if (!q) return s;
-  const i = s.toLowerCase().indexOf(q.toLowerCase());
+  const needle = esc(q);
+  const i = s.toLowerCase().indexOf(needle.toLowerCase());
   if (i < 0) return s;
-  return s.slice(0, i) + '<mark>' + s.slice(i, i + q.length) + '</mark>' + s.slice(i + q.length);
+  return s.slice(0, i) + '<mark>' + s.slice(i, i + needle.length) + '</mark>'
+       + s.slice(i + needle.length);
 }
 
 // Markdown mínimo: código, negritas y títulos. Los saltos los resuelve pre-wrap.
@@ -853,6 +880,8 @@ function openReader(id) {
       ).join('')
     : `<p class="reader-empty">Esta sesión no tiene mensajes.</p>`;
 
+  if (location.hash.slice(1) !== id) history.replaceState(null, '', '#' + id);
+
   bodyEl.scrollTop = 0;
   scrimEl.classList.add('open');
   readerEl.classList.add('open');
@@ -863,11 +892,31 @@ function openReader(id) {
 function closeReader() {
   if (!openId) return;
   openId = null;
+  if (location.hash) history.replaceState(null, '', location.pathname + location.search);
   scrimEl.classList.remove('open');
   readerEl.classList.remove('open');
   document.body.classList.remove('locked');
   if (lastFocus && document.contains(lastFocus)) lastFocus.focus();
 }
+
+function openFromHash() {
+  const id = decodeURIComponent(location.hash.slice(1));
+  if (id && BY_ID.has(id)) openReader(id);
+}
+
+// El diálogo es aria-modal: el foco tiene que quedar adentro mientras está abierto.
+readerEl.addEventListener('keydown', e => {
+  if (e.key !== 'Tab') return;
+  const f = [...readerEl.querySelectorAll('button, [tabindex]:not([tabindex="-1"])')]
+    .filter(el => el.offsetParent !== null);
+  if (!f.length) return;
+  const first = f[0], last = f[f.length - 1];
+  if (e.shiftKey && (document.activeElement === first || document.activeElement === readerEl)) {
+    e.preventDefault(); last.focus();
+  } else if (!e.shiftKey && document.activeElement === last) {
+    e.preventDefault(); first.focus();
+  }
+});
 
 /* ---------- copiar ---------- */
 
@@ -928,7 +977,26 @@ $('#rClose').addEventListener('click', closeReader);
 scrimEl.addEventListener('click', closeReader);
 $('#rCopy').addEventListener('click', e => copyFor(BY_ID.get(openId), e.currentTarget));
 
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeReader(); });
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    if (openId) closeReader();
+    else if (document.activeElement === qEl && qEl.value) { qEl.value = ''; render(); }
+    return;
+  }
+  if (openId) return;
+  const typing = /^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName);
+  if ((e.key === '/' && !typing) || (e.key.toLowerCase() === 'k' && (e.metaKey || e.ctrlKey))) {
+    e.preventDefault();
+    qEl.focus();
+    qEl.select();
+  }
+});
+
+$('#theme').addEventListener('click', () => {
+  const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+  document.documentElement.dataset.theme = next;
+  try { localStorage.setItem('cs-tema', next); } catch (e) {}
+});
 
 document.querySelectorAll('[data-sort]').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -943,9 +1011,12 @@ document.querySelectorAll('[data-sort]').forEach(btn => {
 });
 document.querySelector('[data-sort="l"]').setAttribute('aria-sort', 'descending');
 
-$('#snap').textContent = `Instantánea leída el ${pad(NOW.getDate())} ${MES[NOW.getMonth()]} ${NOW.getFullYear()} a las ${fmtTime(NOW.toISOString())}. Las fechas relativas son respecto de ese momento; volvé a correr build.sh para actualizarla.`;
+$('#snap').textContent = `Instantánea leída el ${pad(NOW.getDate())} ${MES[NOW.getMonth()]} ${NOW.getFullYear()} a las ${fmtTime(NOW.toISOString())}. Las fechas relativas son respecto de ese momento; volvé a correr claude-sesiones --html para actualizarla.`;
 
 [qEl, projEl, deepEl, emptyEl].forEach(el => el.addEventListener(el === qEl ? 'input' : 'change', render));
 
 render();
+openFromHash();
 </script>
+</body>
+</html>
