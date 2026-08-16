@@ -1,0 +1,20 @@
+# Salida del propio comando: son transcripciones completas de tus chats.
+# Nunca las commitees.
+sesiones.html
+data.json
+*.html
+!claude_sesiones/template.html
+
+# Python
+__pycache__/
+*.py[cod]
+build/
+dist/
+*.egg-info/
+.venv/
+venv/
+
+# Editores / SO
+.DS_Store
+.idea/
+.vscode/

@@ -1,0 +1,951 @@
+<title>Sesiones de Claude Code</title>
+<style>
+  :root {
+    --ground:   #EDEEF2;
+    --surface:  #FFFFFF;
+    --raised:   #F6F7F9;
+    --ink:      #14161C;
+    --ink-soft: #3D4250;
+    --muted:    #6A6F7E;
+    --faint:    #9AA0AE;
+    --line:     #DCDEE5;
+    --line-soft:#E7E9EE;
+    --amber:    #A85A16;
+    --amber-lo: #C98A47;
+    --amber-bg: rgba(168, 90, 22, 0.09);
+    --scrim:    rgba(20, 22, 28, .38);
+    --shadow:   0 1px 2px rgba(20, 22, 28, .06), 0 8px 24px -12px rgba(20, 22, 28, .18);
+    --shadow-lg:0 24px 70px -20px rgba(20, 22, 28, .45);
+    --focus:    #2C6FD1;
+
+    --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, "JetBrains Mono", "SFMono-Regular", "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground:   #0E1015;
+      --surface:  #171A21;
+      --raised:   #1D212A;
+      --ink:      #DFE2EA;
+      --ink-soft: #B4BAC7;
+      --muted:    #878DA0;
+      --faint:    #666C7D;
+      --line:     #262A34;
+      --line-soft:#1F232C;
+      --amber:    #E29A4A;
+      --amber-lo: #8A6435;
+      --amber-bg: rgba(226, 154, 74, 0.11);
+      --scrim:    rgba(0, 0, 0, .62);
+      --shadow:   0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.7);
+      --shadow-lg:0 24px 70px -20px rgba(0,0,0,.85);
+      --focus:    #6BA5F0;
+    }
+  }
+
+  :root[data-theme="light"] {
+    --ground:   #EDEEF2;
+    --surface:  #FFFFFF;
+    --raised:   #F6F7F9;
+    --ink:      #14161C;
+    --ink-soft: #3D4250;
+    --muted:    #6A6F7E;
+    --faint:    #9AA0AE;
+    --line:     #DCDEE5;
+    --line-soft:#E7E9EE;
+    --amber:    #A85A16;
+    --amber-lo: #C98A47;
+    --amber-bg: rgba(168, 90, 22, 0.09);
+    --scrim:    rgba(20, 22, 28, .38);
+    --shadow:   0 1px 2px rgba(20, 22, 28, .06), 0 8px 24px -12px rgba(20, 22, 28, .18);
+    --shadow-lg:0 24px 70px -20px rgba(20, 22, 28, .45);
+    --focus:    #2C6FD1;
+  }
+
+  :root[data-theme="dark"] {
+    --ground:   #0E1015;
+    --surface:  #171A21;
+    --raised:   #1D212A;
+    --ink:      #DFE2EA;
+    --ink-soft: #B4BAC7;
+    --muted:    #878DA0;
+    --faint:    #666C7D;
+    --line:     #262A34;
+    --line-soft:#1F232C;
+    --amber:    #E29A4A;
+    --amber-lo: #8A6435;
+    --amber-bg: rgba(226, 154, 74, 0.11);
+    --scrim:    rgba(0, 0, 0, .62);
+    --shadow:   0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.7);
+    --shadow-lg:0 24px 70px -20px rgba(0,0,0,.85);
+    --focus:    #6BA5F0;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  body.locked { overflow: hidden; }
+
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 40px 24px 96px; }
+
+  /* ---------- masthead ---------- */
+
+  .masthead { display: flex; flex-direction: column; gap: 8px; margin-bottom: 28px; }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--amber);
+  }
+
+  h1 {
+    margin: 0;
+    font-size: clamp(28px, 4.5vw, 40px);
+    line-height: 1.1;
+    letter-spacing: -.022em;
+    font-weight: 620;
+    text-wrap: balance;
+  }
+
+  .lede { margin: 0; max-width: 64ch; color: var(--muted); font-size: 15px; }
+  .lede code, .foot code {
+    font-family: var(--mono);
+    font-size: .88em;
+    background: var(--amber-bg);
+    color: var(--amber);
+    padding: 1px 5px;
+    border-radius: 4px;
+  }
+
+  /* ---------- stats ---------- */
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 24px;
+  }
+  .stat { background: var(--surface); padding: 14px 16px 16px; }
+  .stat-k {
+    display: block;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .13em;
+    text-transform: uppercase;
+    color: var(--faint);
+    margin-bottom: 5px;
+  }
+  .stat-v {
+    font-family: var(--mono);
+    font-size: 22px;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -.02em;
+    color: var(--ink);
+  }
+  .stat-v small { font-size: 12px; color: var(--muted); letter-spacing: 0; }
+
+  /* ---------- toolbar ---------- */
+
+  .toolbar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    padding: 12px 0;
+    background: linear-gradient(var(--ground) 76%, transparent);
+  }
+
+  .field { position: relative; flex: 1 1 240px; min-width: 180px; }
+  .field svg { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--faint); pointer-events: none; }
+
+  input[type="search"], select {
+    width: 100%;
+    font: inherit;
+    font-size: 14px;
+    color: var(--ink);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 9px 12px;
+    appearance: none;
+  }
+  input[type="search"] { padding-left: 34px; font-family: var(--mono); font-size: 13px; }
+  input[type="search"]::-webkit-search-cancel-button { filter: grayscale(1) opacity(.5); }
+
+  select {
+    flex: 0 1 auto;
+    width: auto;
+    max-width: 300px;
+    padding-right: 30px;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+    background-position: calc(100% - 16px) calc(50% + 1px), calc(100% - 11px) calc(50% + 1px);
+    background-size: 5px 5px, 5px 5px;
+    background-repeat: no-repeat;
+  }
+
+  .toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 9px 12px;
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+  }
+  .toggle input { accent-color: var(--amber); margin: 0; }
+  .toggle:hover { color: var(--ink); }
+  .toggle:has(input:checked) { color: var(--amber); border-color: var(--amber-lo); background: var(--amber-bg); }
+
+  :is(input, select, button, .toggle, .row[tabindex]):focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 1px;
+  }
+
+  /* ---------- tabla ---------- */
+
+  .grid { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--surface); box-shadow: var(--shadow); }
+
+  .row {
+    display: grid;
+    grid-template-columns: 3px 1fr 108px 58px 66px 128px;
+    align-items: center;
+    gap: 0 14px;
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .row:last-child { border-bottom: 0; }
+  .row.clickable { cursor: pointer; }
+  .row.clickable:hover { background: var(--raised); }
+
+  .head {
+    position: sticky;
+    top: 62px;
+    z-index: 10;
+    background: var(--raised);
+    border-bottom: 1px solid var(--line);
+  }
+  .head span, .head button {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--faint);
+    padding: 9px 0;
+    background: none;
+    border: 0;
+    text-align: left;
+    cursor: default;
+  }
+  .head button { cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
+  .head button:hover { color: var(--ink); }
+  .head button[aria-sort] { color: var(--amber); }
+  .head button .car { opacity: 0; }
+  .head button[aria-sort] .car { opacity: 1; }
+  .head .num { justify-content: flex-end; text-align: right; }
+  .head .pad-l { padding-left: 14px; }
+  .head .pad-r { padding-right: 16px; }
+
+  .r-body { padding: 11px 0 12px; min-width: 0; }
+
+  .stripe { align-self: stretch; background: var(--stripe, transparent); }
+
+  .title {
+    margin: 0 0 3px;
+    font-size: 14px;
+    line-height: 1.42;
+    color: var(--ink);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  mark { background: var(--amber-bg); color: var(--amber); border-radius: 3px; padding: 0 1px; }
+
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--muted);
+    min-width: 0;
+  }
+  .path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+
+  .chip {
+    font-size: 10px;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    padding: 1px 5px;
+    border-radius: 3px;
+    border: 1px solid var(--line);
+    color: var(--faint);
+    white-space: nowrap;
+  }
+  .chip-branch { color: var(--muted); }
+  .chip-empty, .chip-auto { color: var(--amber); border-color: var(--amber-lo); background: var(--amber-bg); }
+
+  .snippet {
+    margin: 5px 0 0;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    line-height: 1.5;
+    color: var(--muted);
+    border-left: 2px solid var(--amber-lo);
+    padding-left: 9px;
+  }
+
+  .cell-n {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink-soft);
+    text-align: right;
+    padding: 11px 0 12px;
+  }
+  .cell-date { font-family: var(--mono); font-size: 12px; font-variant-numeric: tabular-nums; color: var(--ink-soft); padding: 11px 0 12px; }
+  .cell-date small { display: block; color: var(--faint); font-size: 10.5px; letter-spacing: .04em; }
+  .dim { color: var(--faint); }
+
+  .cell-act { padding: 9px 16px 9px 0; display: flex; justify-content: flex-end; }
+
+  .copy {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    background: var(--raised);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 6px 9px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+    transition: color .12s, border-color .12s, background .12s;
+  }
+  .copy:hover, .copy.done { color: var(--amber); border-color: var(--amber-lo); background: var(--amber-bg); }
+
+  .empty-row .title { color: var(--muted); font-style: italic; }
+
+  .none { padding: 48px 20px; text-align: center; color: var(--muted); font-family: var(--mono); font-size: 13px; }
+  .count { font-family: var(--mono); font-size: 11.5px; color: var(--faint); padding: 10px 2px 0; letter-spacing: .04em; }
+
+  /* ---------- lector ---------- */
+
+  .scrim {
+    position: fixed;
+    inset: 0;
+    background: var(--scrim);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .2s;
+    z-index: 40;
+  }
+  .scrim.open { opacity: 1; pointer-events: auto; }
+
+  .reader {
+    position: fixed;
+    top: 0;
+    right: 0;
+    height: 100%;
+    width: min(920px, 100%);
+    display: flex;
+    flex-direction: column;
+    background: var(--ground);
+    border-left: 1px solid var(--line);
+    box-shadow: var(--shadow-lg);
+    transform: translateX(100%);
+    transition: transform .24s cubic-bezier(.4, 0, .2, 1);
+    z-index: 41;
+    visibility: hidden;
+  }
+  .reader.open { transform: none; visibility: visible; }
+
+  .reader-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 18px 20px 15px;
+    border-bottom: 1px solid var(--line);
+    background: var(--surface);
+  }
+  .reader-head h2 {
+    margin: 0 0 6px;
+    font-size: 17px;
+    line-height: 1.3;
+    letter-spacing: -.012em;
+    font-weight: 600;
+    text-wrap: balance;
+  }
+  .rh-text { flex: 1; min-width: 0; }
+  .rh-acts { display: flex; gap: 7px; flex-shrink: 0; }
+
+  .xbtn {
+    background: var(--raised);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    color: var(--muted);
+    cursor: pointer;
+    padding: 7px 9px;
+    display: inline-flex;
+    align-items: center;
+    transition: color .12s, border-color .12s, background .12s;
+  }
+  .xbtn:hover { color: var(--ink); }
+  .xbtn.done { color: var(--amber); border-color: var(--amber-lo); background: var(--amber-bg); }
+
+  .transcript {
+    flex: 1;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 20px 20px 64px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .turn { display: flex; flex-direction: column; gap: 5px; }
+  .who {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .13em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+  .turn-u .who { color: var(--amber); }
+
+  .bubble {
+    border-radius: 8px;
+    padding: 11px 14px;
+    font-size: 14.5px;
+    line-height: 1.62;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    border: 1px solid var(--line-soft);
+    background: var(--surface);
+    color: var(--ink-soft);
+  }
+  .turn-u .bubble { background: var(--amber-bg); border-color: var(--amber-lo); color: var(--ink); }
+
+  .bubble pre {
+    margin: 9px 0;
+    padding: 10px 12px;
+    background: var(--ground);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    overflow-x: auto;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    line-height: 1.55;
+    white-space: pre;
+    color: var(--ink);
+  }
+  .bubble code {
+    font-family: var(--mono);
+    font-size: .87em;
+    background: var(--raised);
+    border: 1px solid var(--line-soft);
+    border-radius: 4px;
+    padding: 1px 4px;
+  }
+  .bubble strong { color: var(--ink); font-weight: 600; }
+  .bubble .h {
+    display: block;
+    margin: 4px 0 -2px;
+    font-size: .95em;
+    font-weight: 620;
+    letter-spacing: -.008em;
+    color: var(--ink);
+  }
+  .bubble pre code { background: none; border: 0; padding: 0; font-size: inherit; }
+
+  .tool {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--muted);
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 3px 0 3px 12px;
+    border-left: 2px solid var(--line);
+    overflow-wrap: anywhere;
+  }
+  .tool b { color: var(--amber); font-weight: 500; flex-shrink: 0; }
+
+  .reader-empty { color: var(--muted); font-family: var(--mono); font-size: 13px; text-align: center; padding: 60px 20px; }
+
+  /* ---------- toast ---------- */
+
+  .toast {
+    position: fixed;
+    left: 50%;
+    bottom: 26px;
+    transform: translate(-50%, 14px);
+    background: var(--ink);
+    color: var(--ground);
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 9px 14px;
+    border-radius: 7px;
+    box-shadow: var(--shadow);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .16s, transform .16s;
+    z-index: 60;
+    max-width: min(90vw, 560px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 16px;
+    align-items: center;
+    margin-top: 18px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--faint);
+  }
+  .legend i { display: inline-block; width: 16px; height: 3px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+
+  .foot {
+    margin-top: 26px;
+    padding-top: 18px;
+    border-top: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 13px;
+    max-width: 68ch;
+  }
+  .foot p { margin: 0 0 8px; }
+
+  @media (max-width: 860px) {
+    .wrap { padding: 28px 14px 72px; }
+    .row { grid-template-columns: 3px 1fr auto; gap: 0 12px; }
+    .head { display: none; }
+    .r-body { padding: 12px 0 4px; grid-column: 2 / -1; }
+    .cell-date { grid-column: 2; padding: 0 0 10px; }
+    .cell-n { display: none; }
+    .cell-act { grid-column: 3; grid-row: 2; padding: 0 12px 10px 0; }
+    select { max-width: 100%; flex: 1 1 100%; }
+    .reader { width: 100%; border-left: 0; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; }
+  }
+</style>
+
+<div class="wrap">
+  <header class="masthead">
+    <span class="eyebrow">~/.claude/projects</span>
+    <h1>Tus sesiones de Claude Code</h1>
+    <p class="lede">Cada conversación queda en un <code>.jsonl</code> local. Hacé clic en cualquier fila para leerla, o copiá el comando para retomarla — el <code>--resume</code> solo encuentra la sesión desde su directorio original, así que el botón copia el <code>cd</code> también.</p>
+  </header>
+
+  <div class="stats" id="stats"></div>
+
+  <div class="toolbar">
+    <div class="field">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg>
+      <input type="search" id="q" placeholder="buscar título, ruta o uuid…" autocomplete="off" spellcheck="false" aria-label="Buscar sesiones">
+    </div>
+    <select id="proj" aria-label="Filtrar por proyecto"></select>
+    <label class="toggle"><input type="checkbox" id="deep"> buscar dentro del chat</label>
+    <label class="toggle"><input type="checkbox" id="hideEmpty"> ocultar vacías</label>
+  </div>
+
+  <div class="grid" role="table" aria-label="Sesiones de Claude Code">
+    <div class="row head" role="row">
+      <span></span>
+      <button type="button" data-sort="t" class="pad-l">Sesión <span class="car">▾</span></button>
+      <button type="button" data-sort="l">Fecha <span class="car">▾</span></button>
+      <button type="button" data-sort="u" class="num">Msgs <span class="car">▾</span></button>
+      <button type="button" data-sort="d" class="num">Dur. <span class="car">▾</span></button>
+      <span class="pad-r" style="text-align:right">Reanudar</span>
+    </div>
+    <div id="rows"></div>
+  </div>
+
+  <p class="count" id="count"></p>
+
+  <div class="legend">
+    <span>Franja izquierda = antigüedad:</span>
+    <span><i style="background:var(--amber)"></i>hoy / ayer</span>
+    <span><i style="background:var(--amber);opacity:.55"></i>última semana</span>
+    <span><i style="background:var(--amber);opacity:.26"></i>dos semanas</span>
+    <span><i style="background:var(--line)"></i>más viejo</span>
+  </div>
+
+  <div class="foot">
+    <p>Los títulos los genera Claude durante la sesión. Cuando falta, cae al primer mensaje tuyo — y ahí se nota, porque arranca en minúscula o suena a pregunta suelta.</p>
+    <p><b>Vacía</b> es una sesión que se abrió pero nunca recibió un mensaje: un <code>/resume</code> cancelado, un <code>/login</code>. <b>No interactiva</b> es un <code>claude -p</code> con algo piped por stdin — típicamente un <code>git diff</code> para redactar el mensaje de commit, no un chat.</p>
+    <p>La transcripción trae el texto de la conversación y una línea por herramienta usada, pero no lo que esas herramientas devolvieron: son el 95 % del volumen en disco.</p>
+    <p id="snap"></p>
+  </div>
+</div>
+
+<div class="scrim" id="scrim"></div>
+
+<aside class="reader" id="reader" role="dialog" aria-modal="true" aria-labelledby="rTitle" tabindex="-1">
+  <div class="reader-head">
+    <div class="rh-text">
+      <h2 id="rTitle"></h2>
+      <div class="meta" id="rMeta"></div>
+    </div>
+    <div class="rh-acts">
+      <button type="button" class="xbtn" id="rCopy" title="Copiar comando para reanudar" aria-label="Copiar comando para reanudar">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="5.5" y="5.5" width="8" height="9" rx="1.5"/><path d="M10.5 3.5H3a.5.5 0 0 0-.5.5v8"/></svg>
+      </button>
+      <button type="button" class="xbtn" id="rClose" title="Cerrar (Esc)" aria-label="Cerrar">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="m4 4 8 8M12 4l-8 8"/></svg>
+      </button>
+    </div>
+  </div>
+  <div class="transcript" id="rBody"></div>
+</aside>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script id="payload" type="application/json">__DATA__</script>
+<script>
+const DATA = JSON.parse(document.getElementById('payload').textContent);
+// Instantánea = la actividad más reciente de los datos, para que "hoy" siga siendo
+// cierto respecto de cuándo se leyeron los logs y no del reloj de quien mira.
+const NOW = new Date(Math.max(...DATA.map(d => +new Date(d.l))));
+const BY_ID = new Map(DATA.map(d => [d.id, d]));
+
+const $ = s => document.querySelector(s);
+const rowsEl = $('#rows'), qEl = $('#q'), projEl = $('#proj'), deepEl = $('#deep'),
+      emptyEl = $('#hideEmpty'), countEl = $('#count'), toastEl = $('#toast'),
+      readerEl = $('#reader'), scrimEl = $('#scrim'), bodyEl = $('#rBody');
+
+let sortKey = 'l', sortDir = -1, openId = null, lastFocus = null;
+
+/* ---------- formato ---------- */
+
+const DAY = 864e5;
+const MES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+const pad = n => String(n).padStart(2, '0');
+
+const daysAgo = iso => (NOW - new Date(iso)) / DAY;
+const fmtDate = iso => { const d = new Date(iso); return `${pad(d.getDate())} ${MES[d.getMonth()]}`; };
+const fmtTime = iso => { const d = new Date(iso); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+
+function fmtRel(iso) {
+  const n = daysAgo(iso);
+  if (n < 1) return 'hoy';
+  if (n < 2) return 'ayer';
+  if (n < 7) return `hace ${Math.floor(n)} d`;
+  if (n < 30) return `hace ${Math.floor(n / 7)} sem`;
+  return `hace ${Math.floor(n / 30)} mes`;
+}
+function fmtDur(m) {
+  if (m == null) return '—';
+  if (m < 1) return '<1m';
+  if (m < 60) return m + 'm';
+  const h = Math.floor(m / 60), r = m % 60;
+  return r ? `${h}h${pad(r)}` : `${h}h`;
+}
+function stripeFor(iso) {
+  const n = daysAgo(iso);
+  if (n < 2)  return 'var(--amber)';
+  if (n < 7)  return 'color-mix(in srgb, var(--amber) 55%, transparent)';
+  if (n < 14) return 'color-mix(in srgb, var(--amber) 26%, transparent)';
+  return 'var(--line)';
+}
+
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+function mark(text, q) {
+  const s = esc(text);
+  if (!q) return s;
+  const i = s.toLowerCase().indexOf(q.toLowerCase());
+  if (i < 0) return s;
+  return s.slice(0, i) + '<mark>' + s.slice(i, i + q.length) + '</mark>' + s.slice(i + q.length);
+}
+
+// Markdown mínimo: código, negritas y títulos. Los saltos los resuelve pre-wrap.
+// El código se guarda aparte antes de tocar negritas, para que un ** dentro de
+// un bloque de código quede tal cual.
+function renderBody(text) {
+  const stash = [];
+  // Tras esc() no queda ningún "<" crudo en el texto: todos son &lt;. Por eso un
+  // marcador con "<" no puede colisionar con el contenido del mensaje.
+  const keep = html => `<K${stash.push(html) - 1}>`;
+
+  let out = esc(text);
+  out = out.replace(/```[a-zA-Z0-9_+-]*\n?([\s\S]*?)```/g,
+    (_, code) => keep(`<pre>${code.replace(/\n+$/, '')}</pre>`));
+  out = out.replace(/`([^`\n]+)`/g, (_, code) => keep(`<code>${code}</code>`));
+  out = out.replace(/^#{1,6}\s+(.+)$/gm, '<b class="h">$1</b>');
+  out = out.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
+
+  return out.replace(/<K(\d+)>/g, (_, i) => stash[i]);
+}
+
+/* ---------- cabecera ---------- */
+
+(function stats() {
+  const msgs = DATA.reduce((a, d) => a + d.u, 0);
+  const mb = DATA.reduce((a, d) => a + d.k, 0) / 1024;
+  const ds = DATA.map(d => new Date(d.l)).sort((a, b) => a - b);
+  const f = ds[0], l = ds[ds.length - 1];
+  $('#stats').innerHTML = [
+    ['sesiones', DATA.length, ''],
+    ['proyectos', new Set(DATA.map(d => d.p)).size, ''],
+    ['tus mensajes', msgs, ''],
+    ['en disco', mb.toFixed(1), ' MB'],
+    ['período', `${pad(f.getDate())} ${MES[f.getMonth()]} – ${pad(l.getDate())} ${MES[l.getMonth()]}`, ''],
+  ].map(([k, v, s]) => `<div class="stat"><span class="stat-k">${k}</span><span class="stat-v">${v}${s ? `<small>${s}</small>` : ''}</span></div>`).join('');
+})();
+
+(function projects() {
+  const counts = {};
+  DATA.forEach(d => counts[d.p] = (counts[d.p] || 0) + 1);
+  projEl.innerHTML = `<option value="">todos los proyectos (${DATA.length})</option>` +
+    Object.entries(counts).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([p, n]) => `<option value="${esc(p)}">${esc(p)} · ${n}</option>`).join('');
+})();
+
+/* ---------- lista ---------- */
+
+function convoText(d) {
+  if (d._flat === undefined) d._flat = d.c.map(m => m.x).join('\n').toLowerCase();
+  return d._flat;
+}
+
+function snippetFor(d, q) {
+  for (const m of d.c) {
+    const i = m.x.toLowerCase().indexOf(q);
+    if (i < 0) continue;
+    const from = Math.max(0, i - 55);
+    const raw = m.x.slice(from, i + q.length + 75).replace(/\s+/g, ' ');
+    return (from ? '…' : '') + raw + '…';
+  }
+  return null;
+}
+
+function current() {
+  const q = qEl.value.trim().toLowerCase();
+  const proj = projEl.value;
+  const deep = deepEl.checked;
+
+  const list = DATA.filter(d => {
+    if (proj && d.p !== proj) return false;
+    if (emptyEl.checked && d.e) return false;
+    if (!q) return true;
+    if ((d.t || '').toLowerCase().includes(q) || d.p.toLowerCase().includes(q)
+        || d.id.toLowerCase().includes(q) || (d.b || '').toLowerCase().includes(q)) return true;
+    return deep && convoText(d).includes(q);
+  });
+
+  const k = sortKey;
+  list.sort((a, b) => {
+    if (k === 't') {
+      const av = (a.t || '~').toLowerCase(), bv = (b.t || '~').toLowerCase();
+      return av < bv ? -sortDir : av > bv ? sortDir : 0;
+    }
+    const av = k === 'l' ? new Date(a.l) : (a[k] ?? -1);
+    const bv = k === 'l' ? new Date(b.l) : (b[k] ?? -1);
+    return (av - bv) * sortDir;
+  });
+  return list;
+}
+
+function render() {
+  const list = current();
+  const q = qEl.value.trim();
+  const ql = q.toLowerCase();
+
+  if (!list.length) {
+    rowsEl.innerHTML = `<div class="none">Ninguna sesión coincide con ese filtro.</div>`;
+    countEl.textContent = '';
+    return;
+  }
+
+  rowsEl.innerHTML = list.map(d => {
+    const inMeta = q && ((d.t || '').toLowerCase().includes(ql) || d.p.toLowerCase().includes(ql));
+    const snip = q && deepEl.checked && !inMeta ? snippetFor(d, ql) : null;
+    const chips = [
+      d.e ? '<span class="chip chip-empty">vacía</span>' : '',
+      d.n ? '<span class="chip chip-auto">no interactiva</span>' : '',
+      d.b && d.b !== 'HEAD' ? `<span class="chip chip-branch">${esc(d.b)}</span>` : '',
+      d.i ? '<span class="chip" title="Ruta deducida de otras sesiones del mismo proyecto">ruta inferida</span>' : '',
+    ].join('');
+
+    return `
+    <div class="row${d.e ? ' empty-row' : ' clickable'}" role="row" data-id="${d.id}"${d.e ? '' : ' tabindex="0"'}>
+      <div class="stripe" style="--stripe:${stripeFor(d.l)}"></div>
+      <div class="r-body">
+        <p class="title">${d.t ? mark(d.t, q) : 'sesión abierta sin mensajes'}</p>
+        <div class="meta"><span class="path" title="${esc(d.p)}">${mark(d.p, q)}</span>${chips}</div>
+        ${snip ? `<p class="snippet">${mark(snip, q)}</p>` : ''}
+      </div>
+      <div class="cell-date">${fmtDate(d.l)}<small>${fmtRel(d.l)} · ${fmtTime(d.l)}</small></div>
+      <div class="cell-n${d.u ? '' : ' dim'}">${d.u || '—'}</div>
+      <div class="cell-n${d.d ? '' : ' dim'}">${fmtDur(d.d)}</div>
+      <div class="cell-act">
+        <button type="button" class="copy" data-copy="${d.id}" title="cd ${esc(d.p)} &amp;&amp; claude --resume ${d.id}">
+          <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="5.5" y="5.5" width="8" height="9" rx="1.5"/><path d="M10.5 3.5H3a.5.5 0 0 0-.5.5v8"/></svg>
+          <span>${d.id.slice(0, 8)}</span>
+        </button>
+      </div>
+    </div>`;
+  }).join('');
+
+  countEl.textContent = list.length === DATA.length
+    ? `${DATA.length} sesiones · clic en una fila para leerla`
+    : `${list.length} de ${DATA.length} sesiones`;
+}
+
+/* ---------- lector ---------- */
+
+const WHO = { u: 'vos', a: 'claude' };
+
+function openReader(id) {
+  const d = BY_ID.get(id);
+  if (!d || d.e) return;
+  openId = id;
+  lastFocus = document.activeElement;
+
+  $('#rTitle').textContent = d.t || 'Sesión sin título';
+  $('#rMeta').innerHTML = [
+    `<span class="path">${esc(d.p)}</span>`,
+    `<span>${fmtDate(d.l)} · ${fmtTime(d.l)}</span>`,
+    `<span>${d.u} tuyos / ${d.a} de Claude</span>`,
+    `<span>${fmtDur(d.d)}</span>`,
+    `<span class="chip">${d.id.slice(0, 8)}</span>`,
+  ].join('');
+
+  bodyEl.innerHTML = d.c.length
+    ? d.c.map(m => m.r === 't'
+        ? `<div class="tool"><b>⚒</b><span>${esc(m.x)}</span></div>`
+        : `<div class="turn turn-${m.r}"><span class="who">${WHO[m.r]}</span><div class="bubble">${renderBody(m.x)}</div></div>`
+      ).join('')
+    : `<p class="reader-empty">Esta sesión no tiene mensajes.</p>`;
+
+  bodyEl.scrollTop = 0;
+  scrimEl.classList.add('open');
+  readerEl.classList.add('open');
+  document.body.classList.add('locked');
+  readerEl.focus();
+}
+
+function closeReader() {
+  if (!openId) return;
+  openId = null;
+  scrimEl.classList.remove('open');
+  readerEl.classList.remove('open');
+  document.body.classList.remove('locked');
+  if (lastFocus && document.contains(lastFocus)) lastFocus.focus();
+}
+
+/* ---------- copiar ---------- */
+
+const cmdFor = d => `cd ${d.p} && claude --resume ${d.id}`;
+
+function copyText(text) {
+  if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(text);
+  return new Promise((res, rej) => {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'position:fixed;opacity:0;top:0;left:0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy') ? res() : rej(); }
+    catch (e) { rej(e); }
+    finally { ta.remove(); }
+  });
+}
+
+let toastTimer;
+function toast(msg) {
+  toastEl.textContent = msg;
+  toastEl.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2600);
+}
+
+function copyFor(d, btn) {
+  if (!d) return;
+  copyText(cmdFor(d)).then(() => {
+    if (btn) { btn.classList.add('done'); setTimeout(() => btn.classList.remove('done'), 1400); }
+    toast('Copiado: ' + cmdFor(d));
+  }).catch(() => toast('No se pudo copiar — el comando está en el tooltip'));
+}
+
+/* ---------- eventos ---------- */
+
+rowsEl.addEventListener('click', e => {
+  const copyBtn = e.target.closest('[data-copy]');
+  if (copyBtn) {
+    e.stopPropagation();
+    copyFor(BY_ID.get(copyBtn.dataset.copy), copyBtn);
+    return;
+  }
+  const row = e.target.closest('.row.clickable');
+  if (row) openReader(row.dataset.id);
+});
+
+rowsEl.addEventListener('keydown', e => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  const row = e.target.closest('.row.clickable');
+  if (!row || e.target.closest('[data-copy]')) return;
+  e.preventDefault();
+  openReader(row.dataset.id);
+});
+
+$('#rClose').addEventListener('click', closeReader);
+scrimEl.addEventListener('click', closeReader);
+$('#rCopy').addEventListener('click', e => copyFor(BY_ID.get(openId), e.currentTarget));
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeReader(); });
+
+document.querySelectorAll('[data-sort]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const k = btn.dataset.sort;
+    if (sortKey === k) sortDir = -sortDir;
+    else { sortKey = k; sortDir = k === 't' ? 1 : -1; }
+    document.querySelectorAll('[data-sort]').forEach(b => b.removeAttribute('aria-sort'));
+    btn.setAttribute('aria-sort', sortDir === 1 ? 'ascending' : 'descending');
+    btn.querySelector('.car').textContent = sortDir === 1 ? '▴' : '▾';
+    render();
+  });
+});
+document.querySelector('[data-sort="l"]').setAttribute('aria-sort', 'descending');
+
+$('#snap').textContent = `Instantánea leída el ${pad(NOW.getDate())} ${MES[NOW.getMonth()]} ${NOW.getFullYear()} a las ${fmtTime(NOW.toISOString())}. Las fechas relativas son respecto de ese momento; volvé a correr build.sh para actualizarla.`;
+
+[qEl, projEl, deepEl, emptyEl].forEach(el => el.addEventListener(el === qEl ? 'input' : 'change', render));
+
+render();
+</script>

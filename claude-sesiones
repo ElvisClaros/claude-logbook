@@ -1,0 +1,775 @@
+#!/usr/bin/env python3
+"""Explorador de sesiones de Claude Code para la terminal.
+
+Claude Code guarda una conversación por archivo en
+~/.claude/projects/<ruta-del-proyecto-codificada>/<uuid>.jsonl
+
+    claude-sesiones                     tabla de todas las sesiones
+    claude-sesiones docker              filtra por título, ruta o rama
+    claude-sesiones -s 3                lee el chat nº 3 de la tabla
+    claude-sesiones -s 5d10f1ee         lo mismo, por prefijo de UUID
+    claude-sesiones -g "port already"   busca dentro de las conversaciones
+    claude-sesiones -r 3                imprime el comando para reanudarla
+    claude-sesiones --json              vuelca todo en JSON (lo usa build.sh)
+
+Sin dependencias: solo la biblioteca estándar.
+"""
+
+import argparse
+import glob
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import textwrap
+import time
+from datetime import datetime, timezone
+
+PROJ_ROOT = os.path.join(os.path.expanduser("~"), ".claude", "projects")
+CACHE = os.path.join(
+    os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache")),
+    "claude-sesiones", "cache.json",
+)
+
+# ─────────────────────────── parseo de los .jsonl ───────────────────────────
+
+TAG_RE = re.compile(r"<[^>]+>")
+REMINDER_RE = re.compile(r"<system-reminder>.*?</system-reminder>", re.S)
+
+# Un mensaje que empieza con alguno de estos no es texto del usuario: es un
+# bloque que genera la propia CLI al ejecutar un comando local.
+SKIP_PREFIXES = (
+    "<local-command-caveat", "<command-name", "<command-message",
+    "<command-args", "<local-command-stdout", "<system-reminder",
+)
+
+TITLE_MAX = 160
+TOOL_ARG_MAX = 140
+
+# Para cada herramienta, el parámetro que mejor resume qué hizo.
+TOOL_KEY = {
+    "Bash": "command", "Read": "file_path", "Edit": "file_path",
+    "Write": "file_path", "NotebookEdit": "notebook_path", "Glob": "pattern",
+    "Grep": "pattern", "WebFetch": "url", "WebSearch": "query",
+    "Task": "description", "Agent": "description", "Skill": "skill",
+}
+
+
+def clean_text(s):
+    """Devuelve texto de usuario legible, o None si es ruido del harness."""
+    if not isinstance(s, str):
+        return None
+    s = s.strip()
+    if not s or s.startswith(SKIP_PREFIXES):
+        return None
+    s = REMINDER_RE.sub(" ", s)
+    s = TAG_RE.sub(" ", s)
+    s = re.sub(r"\s+", " ", s).strip()
+    return s if len(s) >= 3 else None
+
+
+def tool_summary(block):
+    """Una línea del estilo 'Bash: git status' para una llamada a herramienta."""
+    name = block.get("name") or "tool"
+    args = block.get("input") or {}
+    if not isinstance(args, dict):
+        return name
+    val = args.get(TOOL_KEY.get(name, ""))
+    if val is None:
+        val = next((v for v in args.values() if isinstance(v, str)), None)
+    if not isinstance(val, str):
+        return name
+    val = re.sub(r"\s+", " ", val).strip()
+    if len(val) > TOOL_ARG_MAX:
+        val = val[:TOOL_ARG_MAX] + "…"
+    return f"{name}: {val}" if val else name
+
+
+def blocks_of(message):
+    content = message.get("content")
+    if isinstance(content, str):
+        return [{"type": "text", "text": content}]
+    return content if isinstance(content, list) else []
+
+
+def parse_ts(ts):
+    if not ts:
+        return None
+    try:
+        return datetime.fromisoformat(ts.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def read_session(path):
+    session_id = os.path.basename(path)[:-6]  # sin .jsonl
+    first_ts = last_ts = cwd = git_branch = version = None
+    ai_title = fallback_title = None
+    user_msgs = assistant_msgs = 0
+    convo = []
+
+    with open(path, "r", errors="ignore") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                obj = json.loads(line)
+            except json.JSONDecodeError:
+                continue  # línea truncada por una sesión que sigue escribiendo
+
+            kind = obj.get("type")
+
+            if kind == "ai-title":
+                if obj.get("aiTitle"):
+                    ai_title = obj["aiTitle"]  # nos quedamos con el más reciente
+                continue
+
+            ts = obj.get("timestamp")
+            if ts:
+                if first_ts is None:
+                    first_ts = ts
+                last_ts = ts
+            if cwd is None and obj.get("cwd"):
+                cwd = obj["cwd"]
+            if git_branch is None and obj.get("gitBranch"):
+                git_branch = obj["gitBranch"]
+            if obj.get("version"):
+                version = obj["version"]
+
+            if kind not in ("user", "assistant") or obj.get("isSidechain"):
+                continue
+
+            if kind == "user":
+                if obj.get("isMeta"):
+                    continue
+                for b in blocks_of(obj.get("message", {})):
+                    if not isinstance(b, dict):
+                        continue
+                    if b.get("type") == "text":
+                        text = clean_text(b.get("text"))
+                        if text:
+                            user_msgs += 1
+                            if fallback_title is None:
+                                fallback_title = text[:TITLE_MAX]
+                            convo.append({"r": "u", "x": text})
+                    elif b.get("type") == "image":
+                        convo.append({"r": "u", "x": "[imagen adjunta]"})
+            else:
+                counted = False
+                for b in blocks_of(obj.get("message", {})):
+                    if not isinstance(b, dict):
+                        continue
+                    if b.get("type") == "text":
+                        text = (b.get("text") or "").strip()
+                        if text:
+                            convo.append({"r": "a", "x": text})
+                            counted = True
+                    elif b.get("type") == "tool_use":
+                        convo.append({"r": "t", "x": tool_summary(b)})
+                if counted:
+                    assistant_msgs += 1
+
+    st = os.stat(path)
+    ft, lt = parse_ts(first_ts), parse_ts(last_ts)
+
+    # Un único mensaje enorme y ninguna ida y vuelta es la firma de un
+    # `claude -p` con algo piped por stdin (p. ej. un git diff para redactar el
+    # mensaje de commit), no de una conversación.
+    noninteractive = (
+        user_msgs == 1 and not ai_title and bool(convo)
+        and len(convo[0]["x"]) > 1500
+    )
+
+    return {
+        "id": session_id,
+        "project_dir": os.path.basename(os.path.dirname(path)),
+        "p": cwd,
+        "b": git_branch,
+        "t": ai_title or fallback_title,
+        "ai": bool(ai_title),
+        "n": noninteractive,
+        "e": not convo,
+        "f": first_ts,
+        "l": last_ts,
+        "d": round((lt - ft).total_seconds() / 60) if ft and lt else None,
+        "u": user_msgs,
+        "a": assistant_msgs,
+        "k": round(st.st_size / 1024, 1),
+        "v": version,
+        "c": convo,
+        "mtime": datetime.fromtimestamp(st.st_mtime, tz=timezone.utc).isoformat(),
+    }
+
+
+def load_sessions(use_cache=True):
+    """Parsea todas las sesiones, reusando del caché las que no cambiaron."""
+    paths = sorted(glob.glob(os.path.join(PROJ_ROOT, "*", "*.jsonl")))
+
+    cache = {}
+    if use_cache:
+        try:
+            with open(CACHE) as f:
+                cache = json.load(f)
+        except (OSError, json.JSONDecodeError):
+            cache = {}
+
+    sessions, fresh = [], {}
+    for path in paths:
+        try:
+            st = os.stat(path)
+        except OSError:
+            continue
+        stamp = f"{st.st_mtime_ns}:{st.st_size}"
+        hit = cache.get(path)
+        if hit and hit.get("stamp") == stamp:
+            rec = hit["rec"]
+        else:
+            try:
+                rec = read_session(path)
+            except OSError:
+                continue
+        fresh[path] = {"stamp": stamp, "rec": rec}
+        sessions.append(rec)
+
+    if use_cache and fresh != cache:
+        try:
+            os.makedirs(os.path.dirname(CACHE), exist_ok=True)
+            tmp = CACHE + ".tmp"
+            with open(tmp, "w") as f:
+                json.dump(fresh, f, ensure_ascii=False, separators=(",", ":"))
+            os.replace(tmp, CACHE)
+        except OSError:
+            pass  # el caché es una optimización, no una condición de uso
+
+    # Algunas sesiones (un /resume cancelado) nunca registran cwd. El nombre del
+    # directorio no se puede invertir de forma fiable porque "/" y "." se
+    # codifican los dos como "-", así que tomamos la ruta prestada de otra
+    # sesión del mismo proyecto y lo dejamos marcado.
+    known = {}
+    for s in sessions:
+        if s["p"]:
+            known.setdefault(s["project_dir"], s["p"])
+
+    for s in sessions:
+        s["i"] = not s["p"]
+        if not s["p"]:
+            s["p"] = known.get(s["project_dir"], s["project_dir"])
+        if not s["l"]:
+            s["l"] = s["mtime"]
+        if not s["f"]:
+            s["f"] = s["mtime"]
+
+    sessions.sort(key=lambda s: s["l"], reverse=True)
+    return sessions
+
+
+# ──────────────────────────────── presentación ────────────────────────────────
+
+MES = ["ene", "feb", "mar", "abr", "may", "jun",
+       "jul", "ago", "sep", "oct", "nov", "dic"]
+
+
+class Style:
+    """Códigos ANSI, o cadenas vacías si la salida no es una terminal."""
+
+    def __init__(self, enabled):
+        self.on = enabled
+
+    def __getattr__(self, name):
+        codes = {
+            "reset": "0", "bold": "1", "dim": "2", "italic": "3",
+            "amber": "38;5;179", "copper": "38;5;173", "grey": "38;5;245",
+            "faint": "38;5;240", "ink": "38;5;252", "blue": "38;5;110",
+        }
+        if name not in codes:
+            raise AttributeError(name)
+        return f"\x1b[{codes[name]}m" if self.on else ""
+
+
+def visible_len(s):
+    return len(re.sub(r"\x1b\[[0-9;]*m", "", s))
+
+
+def clip(s, width):
+    """Recorta a `width` columnas, con … si no entra."""
+    s = s.replace("\n", " ")
+    if len(s) <= width:
+        return s
+    return s[: max(0, width - 1)] + "…"
+
+
+def fmt_date(iso):
+    d = parse_ts(iso).astimezone()
+    return f"{d.day:02d} {MES[d.month - 1]}"
+
+
+def fmt_time(iso):
+    return parse_ts(iso).astimezone().strftime("%H:%M")
+
+
+def fmt_rel(iso, now):
+    n = (now - parse_ts(iso)).total_seconds() / 86400
+    if n < 1:
+        return "hoy"
+    if n < 2:
+        return "ayer"
+    if n < 7:
+        return f"hace {int(n)}d"
+    if n < 30:
+        return f"hace {int(n // 7)}sem"
+    return f"hace {int(n // 30)}mes"
+
+
+def plural(n, singular, plural_):
+    return f"{n} {singular if n == 1 else plural_}"
+
+
+def fmt_dur(m):
+    if m is None:
+        return "—"
+    if m < 1:
+        return "<1m"
+    if m < 60:
+        return f"{m}m"
+    h, r = divmod(m, 60)
+    return f"{h}h{r:02d}" if r else f"{h}h"
+
+
+def stripe(iso, now, st):
+    """Barra de antigüedad, del ámbar vivo al gris."""
+    n = (now - parse_ts(iso)).total_seconds() / 86400
+    if not st.on:
+        return "|"
+    if n < 2:
+        return f"\x1b[38;5;214m▌{st.reset}"
+    if n < 7:
+        return f"\x1b[38;5;179m▌{st.reset}"
+    if n < 14:
+        return f"\x1b[38;5;137m▌{st.reset}"
+    return f"\x1b[38;5;239m▌{st.reset}"
+
+
+def print_table(sessions, st, now, out):
+    width = shutil.get_terminal_size((100, 24)).columns
+    show_path = width >= 92
+    show_dur = width >= 74
+
+    # columnas fijas: idx(3) barra(1) fecha(6) rel(9) msgs(4) dur(6) id(8) + gaps
+    fixed = 3 + 1 + 6 + 9 + 4 + (6 if show_dur else 0) + 8
+    gaps = 7 if show_dur else 6
+    flex = max(24, width - fixed - gaps)
+    w_title = int(flex * 0.58) if show_path else flex
+    w_path = flex - w_title - 1 if show_path else 0
+
+    head = [
+        f"{'#':>3}", " ",
+        f"{st.faint}{'SESIÓN':<{w_title}}{st.reset}",
+    ]
+    if show_path:
+        head.append(f"{st.faint}{'RUTA':<{w_path}}{st.reset}")
+    head.append(f"{st.faint}{'FECHA':<6} {'CUÁNDO':<9}{st.reset}")
+    head.append(f"{st.faint}{'MSG':>4}{st.reset}")
+    if show_dur:
+        head.append(f"{st.faint}{'DUR':>6}{st.reset}")
+    head.append(f"{st.faint}{'ID':<8}{st.reset}")
+    print(" ".join(head), file=out)
+
+    for i, s in enumerate(sessions, 1):
+        title = s["t"] or "sesión abierta sin mensajes"
+        tcolor = st.dim + st.italic if s["e"] else (st.ink if s["ai"] else "")
+        tags = ""
+        if s["e"]:
+            tags = f" {st.faint}[vacía]{st.reset}"
+        elif s["n"]:
+            tags = f" {st.faint}[auto]{st.reset}"
+
+        avail = w_title - visible_len(tags)
+        cells = [
+            f"{st.faint}{i:>3}{st.reset}",
+            stripe(s["l"], now, st),
+            f"{tcolor}{clip(title, avail):<{avail}}{st.reset}{tags}",
+        ]
+        if show_path:
+            cells.append(f"{st.grey}{clip(s['p'], w_path):<{w_path}}{st.reset}")
+        cells.append(
+            f"{fmt_date(s['l']):<6} {st.faint}{fmt_rel(s['l'], now):<9}{st.reset}"
+        )
+        cells.append(f"{s['u'] or '—':>4}")
+        if show_dur:
+            cells.append(f"{st.grey}{fmt_dur(s['d']):>6}{st.reset}")
+        cells.append(f"{st.faint}{s['id'][:8]}{st.reset}")
+        print(" ".join(cells), file=out)
+
+
+def strip_md(text):
+    """Markdown mínimo para la terminal: saca ** y marcadores de título."""
+    text = re.sub(r"^#{1,6}\s+", "", text, flags=re.M)
+    return re.sub(r"\*\*([^*\n]+)\*\*", r"\1", text)
+
+
+def render_block(text, st, width, code_color):
+    """Formatea un mensaje respetando las cercas de código."""
+    lines = []
+    in_code = False
+    for raw in text.split("\n"):
+        if raw.lstrip().startswith("```"):
+            in_code = not in_code
+            continue
+        if in_code:
+            lines.append(f"  {code_color}{raw}{st.reset}")
+        elif not raw.strip():
+            lines.append("")
+        else:
+            wrapped = textwrap.wrap(
+                strip_md(raw), width=width,
+                break_long_words=False, break_on_hyphens=False,
+            )
+            lines.extend("  " + w for w in (wrapped or [""]))
+    return lines
+
+
+def print_chat(s, st, now, out, show_tools=True):
+    width = min(shutil.get_terminal_size((100, 24)).columns, 100)
+    body = width - 2
+
+    print(f"{st.amber}{st.bold}{s['t'] or 'Sesión sin título'}{st.reset}", file=out)
+    meta = (f"{s['p']}  ·  {fmt_date(s['l'])} {fmt_time(s['l'])}  ·  "
+            f"{s['u']} tuyos / {s['a']} de Claude  ·  {fmt_dur(s['d'])}")
+    print(f"{st.faint}{meta}{st.reset}", file=out)
+    print(f"{st.faint}cd {s['p']} && claude --resume {s['id']}{st.reset}", file=out)
+    print(f"{st.faint}{'─' * min(width, 80)}{st.reset}\n", file=out)
+
+    if not s["c"]:
+        print(f"{st.dim}Esta sesión no tiene mensajes.{st.reset}", file=out)
+        return
+
+    first = True
+    for m in s["c"]:
+        if m["r"] == "t":
+            if show_tools:
+                print(f"  {st.faint}⚒ {clip(m['x'], body - 4)}{st.reset}", file=out)
+                first = False
+            continue
+
+        # La separación va antes de cada turno: así una tanda de herramientas
+        # queda pegada al mensaje que la lanzó y separada del siguiente.
+        if not first:
+            print(file=out)
+        first = False
+
+        who = "vos" if m["r"] == "u" else "claude"
+        color = st.amber if m["r"] == "u" else st.blue
+        print(f"{color}{who}{st.reset}", file=out)
+        for line in render_block(m["x"], st, body, st.grey):
+            print(line, file=out)
+
+
+def pager(text):
+    """Manda el texto a $PAGER si hay terminal; si no, a stdout."""
+    if not sys.stdout.isatty():
+        sys.stdout.write(text)
+        return
+    cmd = os.environ.get("PAGER", "less")
+    args = [cmd, "-R", "-F", "-X"] if os.path.basename(cmd) == "less" else [cmd]
+    try:
+        p = subprocess.Popen(args, stdin=subprocess.PIPE)
+        p.communicate(text.encode())
+    except (OSError, BrokenPipeError):
+        sys.stdout.write(text)
+
+
+# ──────────────────────────────── filtros ────────────────────────────────
+
+def pick(sessions, ref):
+    """Resuelve un índice de la tabla (1-based) o un prefijo de UUID."""
+    if ref.isdigit():
+        i = int(ref)
+        if 1 <= i <= len(sessions):
+            return sessions[i - 1]
+        sys.exit(f"error: el índice {i} está fuera de rango (hay {len(sessions)})")
+
+    hits = [s for s in sessions if s["id"].startswith(ref.lower())]
+    if len(hits) == 1:
+        return hits[0]
+    if not hits:
+        sys.exit(f"error: ninguna sesión empieza con '{ref}'")
+    sys.exit(f"error: '{ref}' es ambiguo, coincide con {len(hits)} sesiones")
+
+
+def apply_filters(sessions, args):
+    out = sessions
+
+    if args.project:
+        needle = os.path.expanduser(args.project).rstrip("/").lower()
+        out = [s for s in out if needle in s["p"].lower()]
+
+    if args.grep:
+        needle = args.grep.lower()
+        out = [s for s in out
+               if any(needle in m["x"].lower() for m in s["c"])]
+
+    if args.query:
+        needle = " ".join(args.query).lower()
+        out = [s for s in out
+               if needle in (s["t"] or "").lower()
+               or needle in s["p"].lower()
+               or needle in (s["b"] or "").lower()
+               or s["id"].startswith(needle)]
+
+    if args.hide_empty:
+        out = [s for s in out if not s["e"]]
+
+    return out
+
+
+# ──────────────────────────────── borrado ────────────────────────────────
+
+def session_path(s):
+    """Ruta del .jsonl. El nombre del archivo es el UUID y el del directorio
+    padre es lo que ya guardamos en project_dir, así que es reconstruible."""
+    return os.path.join(PROJ_ROOT, s["project_dir"], s["id"] + ".jsonl")
+
+
+def confirm(question):
+    """Pregunta s/N. Sin terminal no hay confirmación posible: devuelve False."""
+    try:
+        tty = open("/dev/tty")
+    except OSError:
+        return False
+    try:
+        sys.stderr.write(question)
+        sys.stderr.flush()
+        return tty.readline().strip().lower() in ("s", "si", "sí", "y", "yes")
+    except (OSError, KeyboardInterrupt):
+        return False
+    finally:
+        tty.close()
+
+
+def drop_from_cache(paths):
+    """Saca del caché las sesiones borradas para que no reaparezcan."""
+    try:
+        with open(CACHE) as f:
+            cache = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return
+    for p in paths:
+        cache.pop(p, None)
+    try:
+        tmp = CACHE + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump(cache, f, ensure_ascii=False, separators=(",", ":"))
+        os.replace(tmp, CACHE)
+    except OSError:
+        pass
+
+
+def delete_sessions(targets, args, st, now):
+    """Manda a la papelera (o borra) las sesiones dadas. Devuelve el código de salida."""
+    if not targets:
+        print("No hay sesiones que borrar con ese criterio.", file=sys.stderr)
+        return 0
+
+    print(f"{st.bold}Se van a borrar "
+          f"{plural(len(targets), 'sesión', 'sesiones')}:{st.reset}\n")
+
+    total_kb = 0
+    recent = []
+    for s in targets:
+        path = session_path(s)
+        total_kb += s["k"]
+        title = s["t"] or "sesión abierta sin mensajes"
+        flag = ""
+        try:
+            if time.time() - os.stat(path).st_mtime < 300:
+                recent.append(s)
+                flag = f" {st.copper}← modificada hace menos de 5 min{st.reset}"
+        except OSError:
+            flag = f" {st.copper}← ya no existe{st.reset}"
+        print(f"  {st.faint}{s['id'][:8]}{st.reset} {clip(title, 52):<52} "
+              f"{st.grey}{clip(s['p'], 34):<34}{st.reset} "
+              f"{fmt_date(s['l'])} {st.faint}{s['k']:>7.1f} KB{st.reset}{flag}")
+
+    size = (f"{total_kb / 1024:.1f} MB" if total_kb >= 1024
+            else f"{total_kb:.1f} KB")
+    print(f"\n{st.faint}{size} en total{st.reset}")
+
+    if recent:
+        verbo = "se escribió" if len(recent) == 1 else "se escribieron"
+        print(f"\n{st.copper}Ojo: {len(recent)} de estas {verbo} hace menos de "
+              f"5 minutos. Si es una sesión abierta ahora mismo, Claude Code la "
+              f"sigue usando y va a volver a escribirla al cerrarse.{st.reset}")
+
+    if args.dry_run:
+        print(f"\n{st.faint}--dry-run: no se tocó nada.{st.reset}")
+        return 0
+
+    if not args.yes:
+        print(f"\n{st.copper}Esto no se puede deshacer.{st.reset}")
+        if not confirm("¿Confirmás? [s/N] "):
+            print("Cancelado.", file=sys.stderr)
+            return 1
+
+    done, failed, paths = 0, 0, []
+    for s in targets:
+        path = session_path(s)
+        try:
+            os.remove(path)
+            paths.append(path)
+            done += 1
+        except OSError as e:
+            print(f"error: {s['id'][:8]}: {e}", file=sys.stderr)
+            failed += 1
+
+    drop_from_cache(paths)
+
+    print(f"\n{plural(done, 'sesión borrada', 'sesiones borradas')}.")
+    return 1 if failed else 0
+
+
+def main():
+    ap = argparse.ArgumentParser(
+        prog="claude-sesiones",
+        description="Explorador de sesiones de Claude Code para la terminal.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=textwrap.dedent("""\
+            ejemplos:
+              claude-sesiones                     tabla de todas las sesiones
+              claude-sesiones docker              filtra por título, ruta o rama
+              claude-sesiones -s 3                lee el chat nº 3 de la tabla
+              claude-sesiones -s 5d10f1ee         lo mismo, por prefijo de UUID
+              claude-sesiones -g "port already"   busca dentro de las conversaciones
+              claude-sesiones -r 3                comando para reanudar la nº 3
+              eval "$(claude-sesiones -r 3)"      reanudarla directamente
+
+            el nº es la posición en la tabla que estás viendo, así que si filtraste
+            hay que repetir el filtro para leer esa fila:
+
+              claude-sesiones docker              muestra 3 resultados
+              claude-sesiones docker -s 2         lee el 2º de esos tres
+
+            borrado (irreversible; pregunta antes, salvo con -y):
+              claude-sesiones --delete-empty --dry-run   qué borraría
+              claude-sesiones --delete-empty             borra las vacías
+              claude-sesiones -D 101 -D e0a4300e         borra sesiones puntuales
+              claude-sesiones -p /tmp --delete-empty     solo las vacías de ese proyecto
+        """),
+    )
+    ap.add_argument("query", nargs="*", help="texto a buscar en título, ruta o rama")
+    ap.add_argument("-s", "--show", metavar="REF",
+                    help="muestra el chat: índice de la tabla o prefijo de UUID")
+    ap.add_argument("-r", "--resume", metavar="REF",
+                    help="imprime el comando para reanudar esa sesión")
+    ap.add_argument("-g", "--grep", metavar="TEXTO",
+                    help="filtra por contenido de las conversaciones")
+    ap.add_argument("-p", "--project", metavar="RUTA",
+                    help="filtra por ruta del proyecto")
+    ap.add_argument("-n", "--limit", type=int, metavar="N",
+                    help="muestra solo las N más recientes")
+    ap.add_argument("-E", "--hide-empty", action="store_true",
+                    help="oculta las sesiones sin mensajes")
+    ap.add_argument("--no-tools", action="store_true",
+                    help="en el chat, oculta las llamadas a herramientas")
+    ap.add_argument("--no-pager", action="store_true",
+                    help="no usa $PAGER para el chat")
+    ap.add_argument("--no-color", action="store_true", help="salida sin color")
+    ap.add_argument("--json", action="store_true",
+                    help="vuelca todas las sesiones en JSON")
+
+    borrar = ap.add_argument_group("borrado")
+    borrar.add_argument("-D", "--delete", metavar="REF", nargs="+",
+                        help="borra esas sesiones (índice o prefijo de UUID)")
+    borrar.add_argument("--delete-empty", action="store_true",
+                        help="borra todas las sesiones sin mensajes")
+    borrar.add_argument("-y", "--yes", action="store_true",
+                        help="no pregunta antes de borrar")
+    borrar.add_argument("--dry-run", action="store_true",
+                        help="muestra qué se borraría y no toca nada")
+    ap.add_argument("--no-cache", action="store_true",
+                    help="ignora el caché y re-parsea todo")
+    args = ap.parse_args()
+
+    if not os.path.isdir(PROJ_ROOT):
+        sys.exit(f"error: no existe {PROJ_ROOT} — ¿usaste Claude Code en esta máquina?")
+
+    sessions = load_sessions(use_cache=not args.no_cache)
+    if not sessions:
+        sys.exit("No hay ninguna sesión registrada todavía.")
+
+    if args.json:
+        for s in sessions:
+            s.pop("project_dir", None)
+            s.pop("mtime", None)
+        json.dump(sessions, sys.stdout, ensure_ascii=False, separators=(",", ":"))
+        return
+
+    color = sys.stdout.isatty() and not args.no_color and not os.environ.get("NO_COLOR")
+    st = Style(color)
+    now = max(parse_ts(s["l"]) for s in sessions)
+
+    if args.delete or args.delete_empty:
+        pool = apply_filters(sessions, args)
+        if args.delete_empty:
+            targets = [s for s in pool if s["e"]]
+            if args.delete:
+                seen = {s["id"] for s in targets}
+                targets += [s for s in (pick(pool, r) for r in args.delete)
+                            if s["id"] not in seen]
+        else:
+            # dedup preservando el orden en que se pidieron
+            targets, seen = [], set()
+            for ref in args.delete:
+                s = pick(pool, ref)
+                if s["id"] not in seen:
+                    seen.add(s["id"])
+                    targets.append(s)
+        sys.exit(delete_sessions(targets, args, st, now))
+
+    if args.resume:
+        s = pick(apply_filters(sessions, args), args.resume)
+        print(f"cd {s['p']} && claude --resume {s['id']}")
+        return
+
+    if args.show:
+        s = pick(apply_filters(sessions, args), args.show)
+        buf = []
+
+        class Buf:
+            def write(self, x):
+                buf.append(x)
+
+        print_chat(s, st, now, Buf(), show_tools=not args.no_tools)
+        text = "".join(buf)
+        if args.no_pager:
+            sys.stdout.write(text)
+        else:
+            pager(text)
+        return
+
+    shown = apply_filters(sessions, args)
+    if not shown:
+        sys.exit("Ninguna sesión coincide con ese filtro.")
+    if args.limit:
+        shown = shown[: args.limit]
+
+    print_table(shown, st, now, sys.stdout)
+
+    total, projects = len(sessions), len({s["p"] for s in sessions})
+    tail = (f"{len(shown)} de {total} sesiones" if len(shown) != total
+            else f"{plural(total, 'sesión', 'sesiones')} · "
+                 f"{plural(projects, 'proyecto', 'proyectos')}")
+    print(f"\n{st.faint}{tail} · -s <nº> para leer una{st.reset}")
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except (BrokenPipeError, KeyboardInterrupt):
+        try:
+            sys.stdout.close()
+        except Exception:
+            pass
+        sys.exit(130)
