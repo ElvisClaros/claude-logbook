@@ -3,7 +3,7 @@
 sesiones.html
 data.json
 *.html
-!claude_sesiones/template.html
+!claude_logbook/template.html
 
 # Python
 __pycache__/
