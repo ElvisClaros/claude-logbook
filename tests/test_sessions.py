@@ -4,7 +4,7 @@ import tempfile
 import unittest
 import unittest.mock
 
-from claude_sesiones import sessions as S
+from claude_logbook import sessions as S
 
 from .fixtures import ai_title, assistant, simple_tree, ts, user, write_session
 

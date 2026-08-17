@@ -334,7 +334,7 @@ def print_memory(m, st, out, path=None, width=None):
         print(f"\n{st.faint}enlaces: {', '.join(m['ln'])}{st.reset}", file=out)
     if m["src"]:
         print(f"{st.faint}la creó la sesión {m['src'][:8]}  "
-              f"(claude-sesiones -s {m['src'][:8]}){st.reset}", file=out)
+              f"(claude-logbook -s {m['src'][:8]}){st.reset}", file=out)
 
 
 def print_audit(report, st, out):

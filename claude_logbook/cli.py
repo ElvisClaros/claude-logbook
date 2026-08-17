@@ -27,41 +27,41 @@ RECENT_SECONDS = 300
 
 EPILOG = """\
 ejemplos:
-  claude-sesiones                     tabla de todas las sesiones
-  claude-sesiones docker              filtra por título, ruta o rama
-  claude-sesiones -s 3                lee el chat nº 3 de la tabla
-  claude-sesiones -s 5d10f1ee         lo mismo, por prefijo de UUID
-  claude-sesiones -g "port already"   busca dentro de las conversaciones
-  claude-sesiones -r 3                comando para reanudar la nº 3
-  eval "$(claude-sesiones -r 3)"      reanudarla directamente
-  claude-sesiones --html --open       genera sesiones.html y lo abre
+  claude-logbook                     tabla de todas las sesiones
+  claude-logbook docker              filtra por título, ruta o rama
+  claude-logbook -s 3                lee el chat nº 3 de la tabla
+  claude-logbook -s 5d10f1ee         lo mismo, por prefijo de UUID
+  claude-logbook -g "port already"   busca dentro de las conversaciones
+  claude-logbook -r 3                comando para reanudar la nº 3
+  eval "$(claude-logbook -r 3)"      reanudarla directamente
+  claude-logbook --html --open       genera sesiones.html y lo abre
 
 el nº es la posición en la tabla que estás viendo, así que si filtraste
 hay que repetir el filtro para leer esa fila:
 
-  claude-sesiones docker              muestra 3 resultados
-  claude-sesiones docker -s 2         lee el 2º de esos tres
+  claude-logbook docker              muestra 3 resultados
+  claude-logbook docker -s 2         lee el 2º de esos tres
 
 borrado (irreversible; pregunta antes, salvo con -y):
-  claude-sesiones --delete-empty --dry-run   qué borraría
-  claude-sesiones --delete-empty             borra las vacías
-  claude-sesiones -D 101 -D e0a4300e         borra sesiones puntuales
-  claude-sesiones -p /tmp --delete-empty     solo las vacías de ese proyecto
+  claude-logbook --delete-empty --dry-run   qué borraría
+  claude-logbook --delete-empty             borra las vacías
+  claude-logbook -D 101 -D e0a4300e         borra sesiones puntuales
+  claude-logbook -p /tmp --delete-empty     solo las vacías de ese proyecto
 
 memoria de los proyectos (-m cambia de sesiones a memorias y reusa los mismos
 verbos: filtro, -s para leer, -D para borrar):
-  claude-sesiones -m                  tabla de memorias
-  claude-sesiones -m docker           busca en nombre, descripción y cuerpo
-  claude-sesiones -m -s 3             lee la memoria nº 3
-  claude-sesiones -m -s deadlock      lo mismo, por nombre
-  claude-sesiones -m --check          audita índices, enlaces y orígenes
-  claude-sesiones -m -D 3             la borra y la saca de MEMORY.md
+  claude-logbook -m                  tabla de memorias
+  claude-logbook -m docker           busca en nombre, descripción y cuerpo
+  claude-logbook -m -s 3             lee la memoria nº 3
+  claude-logbook -m -s deadlock      lo mismo, por nombre
+  claude-logbook -m --check          audita índices, enlaces y orígenes
+  claude-logbook -m -D 3             la borra y la saca de MEMORY.md
 """
 
 
 def build_parser():
     ap = argparse.ArgumentParser(
-        prog="claude-sesiones",
+        prog="claude-logbook",
         description="Explorador de sesiones de Claude Code para la terminal.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=textwrap.dedent(EPILOG),
@@ -116,7 +116,7 @@ def build_parser():
     ap.add_argument("--no-cache", action="store_true",
                     help="ignora el caché y re-parsea todo")
     ap.add_argument("--version", action="version",
-                    version=f"claude-sesiones {__version__}")
+                    version=f"claude-logbook {__version__}")
     return ap
 
 

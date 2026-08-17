@@ -55,7 +55,7 @@ def default_root():
 
 def default_cache_path():
     base = os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache")
-    return os.path.join(base, "claude-sesiones", "cache.json")
+    return os.path.join(base, "claude-logbook", "cache.json")
 
 
 def session_path(s, root=None):

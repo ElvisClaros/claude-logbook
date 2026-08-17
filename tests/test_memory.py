@@ -2,7 +2,7 @@ import os
 import tempfile
 import unittest
 
-from claude_sesiones import memory, sessions
+from claude_logbook import memory, sessions
 
 from .fixtures import (
     memory_tree, simple_tree, write_index, write_memory,

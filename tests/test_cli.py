@@ -7,7 +7,7 @@ import unittest
 import unittest.mock
 from contextlib import redirect_stderr, redirect_stdout
 
-from claude_sesiones import cli
+from claude_logbook import cli
 
 from .fixtures import (
     memory_tree, simple_tree, ts, user, write_memory, write_session,

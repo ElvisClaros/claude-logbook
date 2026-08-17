@@ -1380,7 +1380,7 @@ document.querySelectorAll('.tab').forEach(t =>
 // Sin memorias la pestaña no tiene nada que mostrar.
 if (!MEM.length) document.querySelector('.tab[data-mode="m"]').hidden = true;
 
-$('#snap').textContent = `Instantánea leída el ${pad(NOW.getDate())} ${MES[NOW.getMonth()]} ${NOW.getFullYear()} a las ${fmtTime(NOW.toISOString())}. Las fechas relativas son respecto de ese momento; volvé a correr claude-sesiones --html para actualizarla.`;
+$('#snap').textContent = `Instantánea leída el ${pad(NOW.getDate())} ${MES[NOW.getMonth()]} ${NOW.getFullYear()} a las ${fmtTime(NOW.toISOString())}. Las fechas relativas son respecto de ese momento; volvé a correr claude-logbook --html para actualizarla.`;
 
 [qEl, projEl, deepEl, emptyEl, typeEl, unlistedEl].forEach(
   el => el.addEventListener(el === qEl ? 'input' : 'change', render));

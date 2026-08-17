@@ -1,4 +1,4 @@
-# claude-sesiones
+# claude-logbook
 
 Browse every [Claude Code](https://claude.com/claude-code) conversation stored on
 your machine — as a table in your terminal, or as a single self-contained HTML
@@ -36,38 +36,38 @@ the file itself is yours to look after.
 Requires Python 3.9 or newer. Nothing else.
 
 ```bash
-pipx install git+https://github.com/ElvisClaros/claude-sesiones
+pipx install git+https://github.com/ElvisClaros/claude-logbook
 ```
 
 Or with pip, or straight from a clone:
 
 ```bash
-pip install git+https://github.com/ElvisClaros/claude-sesiones
+pip install git+https://github.com/ElvisClaros/claude-logbook
 
-git clone https://github.com/ElvisClaros/claude-sesiones && cd claude-sesiones
-python3 -m claude_sesiones          # no install needed
+git clone https://github.com/ElvisClaros/claude-logbook && cd claude-logbook
+python3 -m claude_logbook          # no install needed
 ```
 
 ## Usage
 
 ```bash
-claude-sesiones                     # table of every session
-claude-sesiones docker              # filter by title, path or branch
-claude-sesiones -s 3                # read conversation #3 from the table
-claude-sesiones -s 5d10f1ee         # same, by UUID prefix
-claude-sesiones -g "port already"   # search inside the conversations
-claude-sesiones -r 3                # print the command that resumes it
-eval "$(claude-sesiones -r 3)"      # …or resume it right away
-claude-sesiones --html --open       # build sesiones.html and open it
-claude-sesiones -m                  # your projects' memories
+claude-logbook                     # table of every session
+claude-logbook docker              # filter by title, path or branch
+claude-logbook -s 3                # read conversation #3 from the table
+claude-logbook -s 5d10f1ee         # same, by UUID prefix
+claude-logbook -g "port already"   # search inside the conversations
+claude-logbook -r 3                # print the command that resumes it
+eval "$(claude-logbook -r 3)"      # …or resume it right away
+claude-logbook --html --open       # build sesiones.html and open it
+claude-logbook -m                  # your projects' memories
 ```
 
 The number is the row's position **in the table you are looking at**, so if you
 filtered, repeat the filter to read that row:
 
 ```bash
-claude-sesiones docker              # shows 3 results
-claude-sesiones docker -s 2         # reads the 2nd of those three
+claude-logbook docker              # shows 3 results
+claude-logbook docker -s 2         # reads the 2nd of those three
 ```
 
 ### Options
@@ -97,10 +97,10 @@ claude-sesiones docker -s 2         # reads the 2nd of those three
 Irreversible, and it asks first unless you pass `-y`:
 
 ```bash
-claude-sesiones --delete-empty --dry-run   # what it would delete
-claude-sesiones --delete-empty             # delete the empty ones
-claude-sesiones -D 101 -D e0a4300e         # delete specific sessions
-claude-sesiones -p /tmp --delete-empty     # only the empty ones of that project
+claude-logbook --delete-empty --dry-run   # what it would delete
+claude-logbook --delete-empty             # delete the empty ones
+claude-logbook -D 101 -D e0a4300e         # delete specific sessions
+claude-logbook -p /tmp --delete-empty     # only the empty ones of that project
 ```
 
 It warns you about any file written in the last five minutes: that is very
@@ -119,12 +119,12 @@ though the file is still there, so the gap between the two is worth watching.
 `-m` swaps the noun and reuses the verbs you already know:
 
 ```bash
-claude-sesiones -m                  # table of memories
-claude-sesiones -m docker           # search name, description and body
-claude-sesiones -m --type user      # only one kind
-claude-sesiones -m -s 3             # read memory #3
-claude-sesiones -m -s deadlock      # same, by name
-claude-sesiones -m -p /home/u/proj  # only one project's
+claude-logbook -m                  # table of memories
+claude-logbook -m docker           # search name, description and body
+claude-logbook -m --type user      # only one kind
+claude-logbook -m -s 3             # read memory #3
+claude-logbook -m -s deadlock      # same, by name
+claude-logbook -m -p /home/u/proj  # only one project's
 ```
 
 Claude picks the kind when it writes them: **project** is work in progress,
@@ -134,7 +134,7 @@ and **reference** points at external resources.
 ### Auditing
 
 ```bash
-claude-sesiones -m --check
+claude-logbook -m --check
 ```
 
 Exits 1 if it finds anything, and reports:
@@ -154,13 +154,13 @@ removing the file it drops its line from `MEMORY.md`, so the index is not left
 pointing at nothing.
 
 ```bash
-claude-sesiones -m -D 3 --dry-run   # what it would delete
-claude-sesiones -m -D deploy-docker # delete that memory
+claude-logbook -m -D 3 --dry-run   # what it would delete
+claude-logbook -m -D deploy-docker # delete that memory
 ```
 
 ## The HTML page
 
-`claude-sesiones --html` produces one file with the data embedded inside it. No
+`claude-logbook --html` produces one file with the data embedded inside it. No
 server, no network, no build step — copy it to another machine and it still
 works.
 
@@ -189,7 +189,7 @@ Claude Code writes one JSON Lines file per conversation:
 
 (`CLAUDE_CONFIG_DIR` is honoured if you moved that directory.)
 
-Every line is an event. `claude-sesiones` walks them and keeps the conversation
+Every line is an event. `claude-logbook` walks them and keeps the conversation
 itself — your messages, Claude's replies, and a one-line summary per tool call
 such as `Bash: git status`. It deliberately **drops tool results**, which are
 about 95% of the bytes on disk and almost none of the meaning.
@@ -210,7 +210,7 @@ A few details worth knowing:
   so the path is borrowed from another session of the same project and flagged.
 - **Sidechains** (subagent transcripts) are skipped.
 - **Cache.** Parsed sessions are cached in
-  `$XDG_CACHE_HOME/claude-sesiones/cache.json`, keyed by size and mtime. It is
+  `$XDG_CACHE_HOME/claude-logbook/cache.json`, keyed by size and mtime. It is
   only an optimisation: if it is missing, stale or corrupt, everything is
   re-parsed. `--no-cache` skips it entirely.
 
@@ -265,7 +265,7 @@ Each memory in `m`:
 ## Development
 
 ```bash
-git clone https://github.com/ElvisClaros/claude-sesiones && cd claude-sesiones
+git clone https://github.com/ElvisClaros/claude-logbook && cd claude-logbook
 python3 -m unittest discover -s tests -t .
 ```
 
@@ -274,11 +274,12 @@ The tests build fake `.jsonl` trees in a temporary directory and never touch
 
 | Module | Responsibility |
 | --- | --- |
-| `claude_sesiones/sessions.py` | Parsing the `.jsonl` files, the cache, filters. |
-| `claude_sesiones/terminal.py` | ANSI colours, the table, printing a conversation. |
-| `claude_sesiones/webpage.py` | Embedding the data into the template. |
-| `claude_sesiones/cli.py` | Argument parsing and the commands. |
-| `claude_sesiones/template.html` | The page: markup, styles and the browser-side code. |
+| `claude_logbook/sessions.py` | Parsing the `.jsonl` files, the cache, filters. |
+| `claude_logbook/memory.py` | Reading the `memory/*.md` files and auditing them. |
+| `claude_logbook/terminal.py` | ANSI colours, the table, printing a conversation. |
+| `claude_logbook/webpage.py` | Embedding the data into the template. |
+| `claude_logbook/cli.py` | Argument parsing and the commands. |
+| `claude_logbook/template.html` | The page: markup, styles and the browser-side code. |
 
 ## License
 

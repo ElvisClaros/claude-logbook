@@ -4,7 +4,7 @@ import re
 import tempfile
 import unittest
 
-from claude_sesiones import webpage
+from claude_logbook import webpage
 
 PAYLOAD_RE = re.compile(
     r'<script id="payload" type="application/json">(.*?)</script>', re.S)

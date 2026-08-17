@@ -2,7 +2,7 @@ import io
 import unittest
 from datetime import datetime, timedelta, timezone
 
-from claude_sesiones import terminal as T
+from claude_logbook import terminal as T
 
 NOW = datetime(2025, 8, 14, 12, 0, tzinfo=timezone.utc)
 

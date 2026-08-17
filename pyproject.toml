@@ -3,14 +3,15 @@ requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "claude-sesiones"
-description = "Explorador de las sesiones de Claude Code: tabla en la terminal y página HTML autocontenida."
+name = "claude-logbook"
+description = "Browse your Claude Code sessions and project memories: a terminal table and a self-contained HTML page."
 readme = "README.md"
 requires-python = ">=3.9"
 license = "Apache-2.0"
 license-files = ["LICENSE", "NOTICE"]
 authors = [{ name = "Elvis Claros Castro" }]
-keywords = ["claude", "claude-code", "cli", "jsonl", "sessions", "transcripts"]
+keywords = ["claude", "claude-code", "cli", "jsonl", "sessions", "transcripts",
+            "memory", "logbook"]
 dynamic = ["version"]
 dependencies = []
 
@@ -25,17 +26,19 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/ElvisClaros/claude-sesiones"
-Issues = "https://github.com/ElvisClaros/claude-sesiones/issues"
+Homepage = "https://github.com/ElvisClaros/claude-logbook"
+Issues = "https://github.com/ElvisClaros/claude-logbook/issues"
 
 [project.scripts]
-claude-sesiones = "claude_sesiones.cli:main"
+claude-logbook = "claude_logbook.cli:main"
+# El nombre viejo sigue andando, para no rehacer la memoria muscular.
+claude-sesiones = "claude_logbook.cli:main"
 
 [tool.setuptools]
-packages = ["claude_sesiones"]
+packages = ["claude_logbook"]
 
 [tool.setuptools.dynamic]
-version = { attr = "claude_sesiones.__version__" }
+version = { attr = "claude_logbook.__version__" }
 
 [tool.setuptools.package-data]
-claude_sesiones = ["template.html"]
+claude_logbook = ["template.html"]
