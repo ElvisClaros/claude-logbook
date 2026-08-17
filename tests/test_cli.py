@@ -9,7 +9,9 @@ from contextlib import redirect_stderr, redirect_stdout
 
 from claude_sesiones import cli
 
-from .fixtures import simple_tree, ts, user, write_session
+from .fixtures import (
+    memory_tree, simple_tree, ts, user, write_memory, write_session,
+)
 
 PAYLOAD_RE = re.compile(
     r'<script id="payload" type="application/json">(.*?)</script>', re.S)
@@ -82,8 +84,9 @@ class TestExportar(CliCase):
         code, out, _ = self.run_cli("--json")
         data = json.loads(out)
         self.assertEqual(code, 0)
-        self.assertEqual(len(data), 3)
-        self.assertNotIn("project_dir", data[0])
+        self.assertEqual(len(data["s"]), 3)
+        self.assertEqual(data["m"], [])
+        self.assertNotIn("project_dir", data["s"][0])
 
     def test_html(self):
         simple_tree(self.root)
@@ -93,7 +96,9 @@ class TestExportar(CliCase):
         self.assertIn("3 sesiones", err)
         with open(out_path, encoding="utf-8") as f:
             html = f.read()
-        self.assertEqual(len(json.loads(PAYLOAD_RE.findall(html)[0])), 3)
+        payload = json.loads(PAYLOAD_RE.findall(html)[0])
+        self.assertEqual(len(payload["s"]), 3)
+        self.assertEqual(payload["m"], [])
 
     def test_html_no_toca_stdout(self):
         # El resumen va a stderr para que `--html /dev/stdout` siga sirviendo.
@@ -205,6 +210,124 @@ class TestParser(unittest.TestCase):
     def test_la_query_junta_las_palabras(self):
         args = cli.build_parser().parse_args(["dos", "palabras"])
         self.assertEqual(args.query, ["dos", "palabras"])
+
+
+class TestMemoria(CliCase):
+    def test_tabla(self):
+        simple_tree(self.root)
+        memory_tree(self.root)
+        code, out, _ = self.run_cli("-m")
+        self.assertEqual(code, 0)
+        self.assertIn("deploy-docker", out)
+        self.assertIn("4 memorias", out)
+
+    def test_sin_memorias_avisa(self):
+        simple_tree(self.root)
+        code, _, err = self.run_cli("-m")
+        self.assertEqual(code, 1)
+        self.assertIn("memorias", err)
+
+    def test_filtra_por_tipo(self):
+        simple_tree(self.root)
+        memory_tree(self.root)
+        code, out, _ = self.run_cli("-m", "--type", "reference")
+        self.assertEqual(code, 0)
+        self.assertIn("roles-db", out)
+        self.assertNotIn("deploy-docker", out)
+
+    def test_la_query_busca_en_el_cuerpo(self):
+        simple_tree(self.root)
+        memory_tree(self.root)
+        code, out, _ = self.run_cli("-m", "make up")
+        self.assertEqual(code, 0)
+        self.assertIn("deploy-docker", out)
+        self.assertNotIn("roles-db", out)
+
+    def test_show_por_nombre(self):
+        simple_tree(self.root)
+        memory_tree(self.root)
+        code, out, _ = self.run_cli("-m", "-s", "deploy", "--no-pager")
+        self.assertEqual(code, 0)
+        self.assertIn("Se despliega con", out)
+        self.assertIn("deploy-docker", out)
+
+    def test_show_avisa_si_no_esta_indexada(self):
+        simple_tree(self.root)
+        memory_tree(self.root)
+        _, out, _ = self.run_cli("-m", "-s", "suelta", "--no-pager")
+        self.assertIn("MEMORY.md", out)
+
+    def test_check_lista_los_problemas(self):
+        simple_tree(self.root)
+        memory_tree(self.root)
+        code, out, _ = self.run_cli("-m", "--check")
+        self.assertEqual(code, 1)  # hay cosas para mirar
+        self.assertIn("sin MEMORY.md", out)
+        self.assertIn("no-existe", out)
+
+    def test_check_limpio_sale_cero(self):
+        simple_tree(self.root)
+        write_memory(self.root, "-home-u-proj", "sola", body="sin enlaces")
+        from .fixtures import write_index
+        write_index(self.root, "-home-u-proj", ["sola"])
+        code, out, _ = self.run_cli("-m", "--check")
+        self.assertEqual(code, 0)
+        self.assertIn("Todo en orden", out)
+
+    def test_borrado_en_seco_no_toca_nada(self):
+        simple_tree(self.root)
+        memory_tree(self.root)
+        path = os.path.join(self.root, "-home-u-proj", "memory",
+                            "deploy-docker.md")
+        code, out, _ = self.run_cli("-m", "-D", "deploy", "--dry-run")
+        self.assertEqual(code, 0)
+        self.assertIn("no se tocó nada", out)
+        self.assertTrue(os.path.exists(path))
+
+    def test_borra_y_desindexa(self):
+        simple_tree(self.root)
+        memory_tree(self.root)
+        path = os.path.join(self.root, "-home-u-proj", "memory",
+                            "deploy-docker.md")
+        code, out, _ = self.run_cli("-m", "-D", "deploy", "-y")
+        self.assertEqual(code, 0)
+        self.assertFalse(os.path.exists(path))
+        with open(os.path.join(self.root, "-home-u-proj", "memory",
+                               "MEMORY.md"), encoding="utf-8") as f:
+            index = f.read()
+        self.assertNotIn("deploy-docker.md", index)
+        self.assertIn("roles-db.md", index)
+        self.assertIn("sacadas del índice", out)
+
+    def test_borrado_sin_confirmar_cancela(self):
+        simple_tree(self.root)
+        memory_tree(self.root)
+        path = os.path.join(self.root, "-home-u-proj", "memory",
+                            "deploy-docker.md")
+        with unittest.mock.patch.object(cli, "confirm", return_value=False):
+            code, _, err = self.run_cli("-m", "-D", "deploy")
+        self.assertEqual(code, 1)
+        self.assertIn("Cancelado", err)
+        self.assertTrue(os.path.exists(path))
+
+    def test_referencia_inexistente(self):
+        simple_tree(self.root)
+        memory_tree(self.root)
+        code, _, err = self.run_cli("-m", "-s", "no-existe-nada")
+        self.assertEqual(code, 2)
+        self.assertIn("ninguna memoria", err)
+
+    def test_html_embebe_las_memorias(self):
+        simple_tree(self.root)
+        memory_tree(self.root)
+        out_path = os.path.join(self.home, "s.html")
+        code, _, err = self.run_cli("--html", out_path)
+        self.assertEqual(code, 0)
+        self.assertIn("4 memorias", err)
+        with open(out_path, encoding="utf-8") as f:
+            payload = json.loads(PAYLOAD_RE.findall(f.read())[0])
+        self.assertEqual(len(payload["m"]), 4)
+        self.assertIn("deploy-docker", {m["name"] for m in payload["m"]})
 
 
 if __name__ == "__main__":

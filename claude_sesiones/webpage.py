@@ -23,18 +23,27 @@ def template_text(path=None):
     return (resources.files(__package__) / TEMPLATE_NAME).read_text(encoding="utf-8")
 
 
-def encode_payload(records):
-    """Serializa los registros para meterlos en un <script type=application/json>.
+def build_payload(sessions, memories=None):
+    """Estructura que viaja embebida en la página.
+
+    Un objeto y no una lista porque la página muestra dos cosas distintas:
+    sesiones y memorias de proyecto.
+    """
+    return {"s": list(sessions), "m": list(memories or ())}
+
+
+def encode_payload(payload):
+    """Serializa el payload para meterlo en un <script type=application/json>.
 
     El parser de HTML corta ese bloque en el primer "</script", y las
     transcripciones tienen HTML adentro. Escapamos "</" como "<\\/", que es un
     escape válido de JSON: JSON.parse lo devuelve intacto.
     """
-    raw = json.dumps(records, ensure_ascii=False, separators=(",", ":"))
+    raw = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
     return raw.replace("</", "<\\/")
 
 
-def render(records, template=None):
+def render(records, memories=None, template=None):
     """Devuelve el HTML completo con los datos ya embebidos."""
     html = template if template is not None else template_text()
     # No se puede verificar el resultado buscando el marcador: estas mismas
@@ -44,21 +53,22 @@ def render(records, template=None):
         raise TemplateError(
             f"el template debe tener exactamente un {MARKER} "
             f"(encontrados: {html.count(MARKER)})")
-    return html.replace(MARKER, encode_payload(records))
+    return html.replace(MARKER, encode_payload(build_payload(records, memories)))
 
 
-def write(records, out_path, template=None):
+def write(records, out_path, memories=None, template=None):
     """Escribe la página y devuelve un resumen de lo que quedó adentro."""
-    html = render(records, template=template)
+    html = render(records, memories=memories, template=template)
     with open(out_path, "w", encoding="utf-8") as f:
         f.write(html)
-    return summary(records)
+    return summary(records, memories)
 
 
-def summary(records):
+def summary(records, memories=None):
     return {
         "sesiones": len(records),
         "proyectos": len({r["p"] for r in records}),
         "mensajes": sum(r["u"] for r in records),
         "bloques": sum(len(r["c"]) for r in records),
+        "memorias": len(memories or ()),
     }

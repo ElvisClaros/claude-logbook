@@ -19,7 +19,8 @@ Español · **[English](README.md)** · Sin dependencias, solo biblioteca están
 
 ## ⚠️ Tus transcripciones son privadas
 
-`--json` y `--html` escriben **el texto completo de tus conversaciones**:
+`--json` y `--html` escriben **el texto completo de tus conversaciones y de las
+memorias de tus proyectos**:
 prompts, respuestas, rutas de archivos, nombres de ramas. El `sesiones.html` que
 sale es una copia legible de todo lo que escribiste alguna vez en Claude Code.
 
@@ -54,6 +55,7 @@ claude-sesiones -g "port already"   # busca dentro de las conversaciones
 claude-sesiones -r 3                # imprime el comando para reanudarla
 eval "$(claude-sesiones -r 3)"      # …o la reanuda directamente
 claude-sesiones --html --open       # genera sesiones.html y lo abre
+claude-sesiones -m                  # las memorias de tus proyectos
 ```
 
 El número es la posición de la fila **en la tabla que estás viendo**, así que si
@@ -82,6 +84,9 @@ claude-sesiones docker -s 2         # lee el 2º de esos tres
 | `--template ARCHIVO` | Usa tu propio template para `--html`. |
 | `--open` | Abre en el navegador lo que haya generado `--html`. |
 | `--no-cache` | Ignora el caché y re-parsea todo. |
+| `-m`, `--memory` | Trabaja sobre las memorias en vez de las sesiones. |
+| `--type TIPO` | Con `-m`: filtra por `project`, `user`, `feedback` o `reference`. |
+| `--check` | Con `-m`: audita índices, enlaces y sesiones de origen. |
 
 ### Borrar sesiones
 
@@ -97,6 +102,58 @@ claude-sesiones -p /tmp --delete-empty     # solo las vacías de ese proyecto
 Avisa si alguno de los archivos se escribió en los últimos cinco minutos: es muy
 probable que sea una sesión que Claude Code todavía tiene abierta, y que la
 vuelva a escribir al cerrarse.
+
+## Memoria de los proyectos
+
+Claude Code guarda recuerdos por proyecto en
+`~/.claude/projects/<proyecto>/memory/`: un `.md` por memoria, con frontmatter
+YAML y cuerpo markdown, más un `MEMORY.md` que los indexa.
+
+**El índice es lo único que se carga en contexto al arrancar una sesión.** Una
+memoria que está en disco pero no figura en `MEMORY.md` deja de recordarse
+aunque el archivo siga ahí, así que la diferencia entre ambos conviene mirarla.
+
+`-m` cambia el sustantivo y reusa los mismos verbos que ya conocés:
+
+```bash
+claude-sesiones -m                  # tabla de memorias
+claude-sesiones -m docker           # busca en nombre, descripción y cuerpo
+claude-sesiones -m --type user      # solo las de un tipo
+claude-sesiones -m -s 3             # lee la memoria nº 3
+claude-sesiones -m -s deadlock      # lo mismo, por nombre
+claude-sesiones -m -p /home/u/proj  # las de un proyecto
+```
+
+Los tipos los define Claude al escribirlas: **project** es trabajo en curso,
+**user** quién sos y cómo trabajás, **feedback** correcciones tuyas, y
+**reference** punteros a recursos externos.
+
+### Auditar
+
+```bash
+claude-sesiones -m --check
+```
+
+Sale con código 1 si encuentra algo, y reporta:
+
+- proyectos con memorias pero sin `MEMORY.md`;
+- memorias que no figuran en el índice de su proyecto;
+- entradas del índice que apuntan a un archivo que ya no existe;
+- enlaces `[[...]]` sin destino — el formato los permite, marcan algo que
+  todavía no se escribió;
+- memorias cuya sesión de origen ya no está en disco: la memoria sobrevivió a
+  la conversación que la creó.
+
+### Borrar memorias
+
+Igual que con las sesiones: irreversible, pregunta antes salvo con `-y`. Además
+de borrar el archivo, saca su línea de `MEMORY.md` para no dejar el índice
+apuntando a la nada.
+
+```bash
+claude-sesiones -m -D 3 --dry-run   # qué borraría
+claude-sesiones -m -D deploy-docker # borra esa memoria
+```
 
 ## La página HTML
 
@@ -155,9 +212,18 @@ Algunos detalles que conviene saber:
 
 ### Esquema del JSON
 
-`--json` imprime un arreglo, de la sesión más recientemente activa a la más
-vieja. Las claves son de una letra porque esos mismos registros van embebidos en
-el HTML, donde el costo se paga una vez por sesión:
+`--json` imprime un objeto con dos arreglos: `s` son las sesiones, de la más
+recientemente activa a la más vieja, y `m` las memorias, de la más recién
+modificada a la más vieja.
+
+```json
+{"s": [ … ], "m": [ … ]}
+```
+
+Las claves son de una letra porque esos mismos registros van embebidos en el
+HTML, donde el costo se paga una vez por registro.
+
+Cada sesión de `s`:
 
 | Clave | Qué es |
 | --- | --- |
@@ -175,6 +241,23 @@ el HTML, donde el costo se paga una vez por sesión:
 | `k` | Tamaño del archivo en KB. |
 | `v` | Versión de Claude Code. |
 | `c` | Transcripción: `[{"r": "u"｜"a"｜"t", "x": texto}]`. |
+
+Cada memoria de `m`:
+
+| Clave | Qué es |
+| --- | --- |
+| `name` | Nombre del frontmatter (o el del archivo, si falta). |
+| `file` | Nombre del archivo, con extensión. |
+| `p` | Ruta del proyecto. |
+| `desc` | Descripción del frontmatter. |
+| `ty` | Tipo: `project`, `user`, `feedback` o `reference`. |
+| `src` | UUID de la sesión que la escribió, si lo declara. |
+| `body` | Cuerpo markdown, sin el frontmatter. |
+| `ln` | Enlaces `[[...]]` que aparecen en el cuerpo. |
+| `k` | Tamaño en KB. |
+| `l` | Última modificación (ISO 8601). |
+| `ix` | `true` si figura en `MEMORY.md`. |
+| `hix` | `true` si el proyecto tiene `MEMORY.md`. |
 
 ## Desarrollo
 

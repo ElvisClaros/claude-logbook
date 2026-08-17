@@ -22,7 +22,8 @@ page you open with a double click.
 
 ## ⚠️ Your transcripts are private
 
-`--json` and `--html` write out **the full text of your conversations**: prompts,
+`--json` and `--html` write out **the full text of your conversations and your
+projects' memories**: prompts,
 answers, file paths, branch names. The generated `sesiones.html` is a complete,
 readable copy of everything you ever typed into Claude Code.
 
@@ -58,6 +59,7 @@ claude-sesiones -g "port already"   # search inside the conversations
 claude-sesiones -r 3                # print the command that resumes it
 eval "$(claude-sesiones -r 3)"      # …or resume it right away
 claude-sesiones --html --open       # build sesiones.html and open it
+claude-sesiones -m                  # your projects' memories
 ```
 
 The number is the row's position **in the table you are looking at**, so if you
@@ -86,6 +88,9 @@ claude-sesiones docker -s 2         # reads the 2nd of those three
 | `--template FILE` | Use your own template for `--html`. |
 | `--open` | Open whatever `--html` produced in your browser. |
 | `--no-cache` | Ignore the cache and re-parse everything. |
+| `-m`, `--memory` | Work on memories instead of sessions. |
+| `--type KIND` | With `-m`: filter by `project`, `user`, `feedback` or `reference`. |
+| `--check` | With `-m`: audit indexes, links and origin sessions. |
 
 ### Deleting sessions
 
@@ -100,6 +105,58 @@ claude-sesiones -p /tmp --delete-empty     # only the empty ones of that project
 
 It warns you about any file written in the last five minutes: that is very
 likely a session Claude Code still has open, and it will write it back on exit.
+
+## Project memory
+
+Claude Code stores per-project memories in
+`~/.claude/projects/<project>/memory/`: one `.md` per memory, with YAML
+frontmatter and a markdown body, plus a `MEMORY.md` that indexes them.
+
+**The index is the only part loaded into context when a session starts.** A
+memory that is on disk but missing from `MEMORY.md` stops being remembered even
+though the file is still there, so the gap between the two is worth watching.
+
+`-m` swaps the noun and reuses the verbs you already know:
+
+```bash
+claude-sesiones -m                  # table of memories
+claude-sesiones -m docker           # search name, description and body
+claude-sesiones -m --type user      # only one kind
+claude-sesiones -m -s 3             # read memory #3
+claude-sesiones -m -s deadlock      # same, by name
+claude-sesiones -m -p /home/u/proj  # only one project's
+```
+
+Claude picks the kind when it writes them: **project** is work in progress,
+**user** is who you are and how you work, **feedback** is corrections you gave,
+and **reference** points at external resources.
+
+### Auditing
+
+```bash
+claude-sesiones -m --check
+```
+
+Exits 1 if it finds anything, and reports:
+
+- projects with memories but no `MEMORY.md`;
+- memories missing from their project's index;
+- index entries pointing at a file that no longer exists;
+- `[[...]]` links with no target — the format allows them, they mark something
+  not written yet;
+- memories whose origin session is gone from disk: the memory outlived the
+  conversation that created it.
+
+### Deleting memories
+
+Same as sessions: irreversible, asks first unless you pass `-y`. Besides
+removing the file it drops its line from `MEMORY.md`, so the index is not left
+pointing at nothing.
+
+```bash
+claude-sesiones -m -D 3 --dry-run   # what it would delete
+claude-sesiones -m -D deploy-docker # delete that memory
+```
 
 ## The HTML page
 
@@ -159,9 +216,17 @@ A few details worth knowing:
 
 ### JSON schema
 
-`--json` prints an array, most recently active first. Keys are one letter
-because the same records are embedded in the HTML, where the cost is paid once
-per session:
+`--json` prints an object with two arrays: `s` holds the sessions, most
+recently active first, and `m` the memories, most recently modified first.
+
+```json
+{"s": [ … ], "m": [ … ]}
+```
+
+Keys are one letter because the same records are embedded in the HTML, where
+the cost is paid once per record.
+
+Each session in `s`:
 
 | Key | Meaning |
 | --- | --- |
@@ -179,6 +244,23 @@ per session:
 | `k` | File size in KB. |
 | `v` | Claude Code version. |
 | `c` | Transcript: `[{"r": "u"｜"a"｜"t", "x": text}]`. |
+
+Each memory in `m`:
+
+| Key | Meaning |
+| --- | --- |
+| `name` | Name from the frontmatter (or the filename, if missing). |
+| `file` | File name, with extension. |
+| `p` | Project path. |
+| `desc` | Description from the frontmatter. |
+| `ty` | Kind: `project`, `user`, `feedback` or `reference`. |
+| `src` | UUID of the session that wrote it, when declared. |
+| `body` | Markdown body, without the frontmatter. |
+| `ln` | `[[...]]` links found in the body. |
+| `k` | Size in KB. |
+| `l` | Last modified (ISO 8601). |
+| `ix` | `true` if listed in `MEMORY.md`. |
+| `hix` | `true` if the project has a `MEMORY.md`. |
 
 ## Development
 

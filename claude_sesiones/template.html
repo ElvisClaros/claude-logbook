@@ -570,6 +570,153 @@
     .reader { width: 100%; border-left: 0; }
   }
 
+  /* ---------- pestañas y memorias ---------- */
+
+  .tabs {
+    display: flex;
+    gap: 2px;
+    margin-bottom: 18px;
+    border-bottom: 1px solid var(--line);
+  }
+  .tab {
+    font: inherit;
+    font-size: 13.5px;
+    color: var(--muted);
+    background: none;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    padding: 8px 14px;
+    margin-bottom: -1px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .tab:hover { color: var(--ink); }
+  .tab[aria-selected="true"] { color: var(--amber); border-bottom-color: var(--amber); }
+  .tab .n {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    color: var(--faint);
+    background: var(--raised);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 0 6px;
+  }
+  .tab[aria-selected="true"] .n { color: var(--amber); border-color: var(--amber-lo); background: var(--amber-bg); }
+
+  body[data-mode="s"] .only-m,
+  body[data-mode="m"] .only-s { display: none; }
+
+  .row.mem { grid-template-columns: 3px 1fr 104px 210px 108px; }
+
+  .mem-name { display: flex; align-items: baseline; gap: 7px; flex-wrap: wrap; }
+  .mem-name .nm { font-size: 14px; color: var(--ink); font-family: var(--mono); }
+  .mem-desc {
+    margin: 3px 0 0;
+    font-size: 12.5px;
+    line-height: 1.45;
+    color: var(--muted);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .ty {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: .05em;
+    padding: 1px 6px;
+    border-radius: 3px;
+    border: 1px solid var(--line);
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .ty-project   { color: var(--amber); border-color: var(--amber-lo); background: var(--amber-bg); }
+  .ty-user      { color: var(--focus); border-color: var(--focus); background: transparent; }
+  .ty-feedback  { color: var(--copper, var(--amber)); border-color: var(--amber-lo); }
+  .ty-reference { color: var(--muted); }
+
+  /* Una memoria fuera de MEMORY.md sigue en disco pero no se carga en contexto. */
+  .chip-unlisted { color: var(--amber); border-color: var(--amber-lo); background: var(--amber-bg); }
+
+  .mem-body {
+    font-size: 14.5px;
+    line-height: 1.68;
+    color: var(--ink-soft);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  .mem-body pre {
+    margin: 10px 0;
+    padding: 10px 12px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    overflow-x: auto;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    white-space: pre;
+    color: var(--ink);
+  }
+  .mem-body code {
+    font-family: var(--mono);
+    font-size: .87em;
+    background: var(--surface);
+    border: 1px solid var(--line-soft);
+    border-radius: 4px;
+    padding: 1px 4px;
+  }
+  .mem-body pre code { background: none; border: 0; padding: 0; font-size: inherit; }
+  .mem-body strong { color: var(--ink); font-weight: 600; }
+  .mem-body .h { display: block; margin: 10px 0 -2px; font-weight: 620; color: var(--ink); }
+
+  .wl {
+    font-family: var(--mono);
+    font-size: .9em;
+    color: var(--amber);
+    background: var(--amber-bg);
+    border: 1px solid var(--amber-lo);
+    border-radius: 4px;
+    padding: 0 4px;
+    cursor: pointer;
+  }
+  .wl.dead { color: var(--faint); border-color: var(--line); background: none; cursor: default; }
+
+  .mem-foot {
+    margin-top: 22px;
+    padding-top: 14px;
+    border-top: 1px solid var(--line);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--muted);
+  }
+  .mem-foot .lbl { color: var(--faint); margin-right: 6px; }
+
+  .jump {
+    align-self: flex-start;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--muted);
+    background: var(--raised);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 6px 10px;
+    cursor: pointer;
+  }
+  .jump:hover { color: var(--amber); border-color: var(--amber-lo); background: var(--amber-bg); }
+
+  @media (max-width: 860px) {
+    .row.mem { grid-template-columns: 3px 1fr auto; }
+    .row.mem .cell-ty { grid-column: 2; padding-bottom: 10px; }
+    .row.mem .cell-proj { display: none; }
+  }
+
   @media (prefers-reduced-motion: reduce) {
     * { transition: none !important; }
   }
@@ -590,6 +737,15 @@
     <code>&lt;script id="payload"&gt;</code>.</p>
   </noscript>
 
+  <div class="tabs" role="tablist" aria-label="Qué mirar">
+    <button type="button" class="tab" role="tab" data-mode="s" aria-selected="true">
+      Sesiones <span class="n" id="nS"></span>
+    </button>
+    <button type="button" class="tab" role="tab" data-mode="m" aria-selected="false">
+      Memorias <span class="n" id="nM"></span>
+    </button>
+  </div>
+
   <div class="stats" id="stats"></div>
 
   <div class="toolbar">
@@ -598,8 +754,10 @@
       <input type="search" id="q" placeholder="buscar título, ruta o uuid…  (/)" autocomplete="off" spellcheck="false" aria-label="Buscar sesiones">
     </div>
     <select id="proj" aria-label="Filtrar por proyecto"></select>
-    <label class="toggle"><input type="checkbox" id="deep"> buscar dentro del chat</label>
-    <label class="toggle"><input type="checkbox" id="hideEmpty"> ocultar vacías</label>
+    <label class="toggle only-s"><input type="checkbox" id="deep"> buscar dentro del chat</label>
+    <label class="toggle only-s"><input type="checkbox" id="hideEmpty"> ocultar vacías</label>
+    <select id="mtype" class="only-m" aria-label="Filtrar por tipo de memoria"></select>
+    <label class="toggle only-m"><input type="checkbox" id="unlisted"> solo fuera del índice</label>
     <button type="button" class="tbtn" id="theme" title="Cambiar entre claro y oscuro" aria-label="Cambiar tema">
       <svg class="moon" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M13.5 9.6A5.8 5.8 0 0 1 6.4 2.5a5.8 5.8 0 1 0 7.1 7.1Z"/></svg>
       <svg class="sun" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="3.1"/><path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/></svg>
@@ -607,7 +765,7 @@
   </div>
 
   <div class="grid" role="table" aria-label="Sesiones de Claude Code">
-    <div class="row head" role="row">
+    <div class="row head only-s" role="row">
       <span></span>
       <button type="button" data-sort="t" class="pad-l">Sesión <span class="car">▾</span></button>
       <button type="button" data-sort="l">Fecha <span class="car">▾</span></button>
@@ -615,12 +773,19 @@
       <button type="button" data-sort="d" class="num">Dur. <span class="car">▾</span></button>
       <span class="pad-r" style="text-align:right">Reanudar</span>
     </div>
+    <div class="row head mem only-m" role="row">
+      <span></span>
+      <button type="button" data-msort="name" class="pad-l">Memoria <span class="car">▾</span></button>
+      <button type="button" data-msort="ty">Tipo <span class="car">▾</span></button>
+      <button type="button" data-msort="p">Proyecto <span class="car">▾</span></button>
+      <button type="button" data-msort="l">Fecha <span class="car">▾</span></button>
+    </div>
     <div id="rows"></div>
   </div>
 
   <p class="count" id="count"></p>
 
-  <div class="legend">
+  <div class="legend only-s">
     <span>Franja izquierda = antigüedad:</span>
     <span><i style="background:var(--amber)"></i>hoy / ayer</span>
     <span><i style="background:var(--amber);opacity:.55"></i>última semana</span>
@@ -628,7 +793,16 @@
     <span><i style="background:var(--line)"></i>más viejo</span>
   </div>
 
-  <div class="foot">
+  <div class="legend only-m">
+    <span><span class="chip chip-unlisted">fuera del índice</span> = está en disco pero no figura en MEMORY.md, así que no se carga en contexto</span>
+  </div>
+
+  <div class="foot only-m">
+    <p>Cada proyecto guarda sus recuerdos en <code>&lt;proyecto&gt;/memory/</code>: un <code>.md</code> por memoria y un <code>MEMORY.md</code> que los indexa. El índice es lo único que se lee al arrancar una sesión.</p>
+    <p>Los tipos los define Claude al escribirlas: <b>project</b> es trabajo en curso, <b>user</b> quién sos y cómo trabajás, <b>feedback</b> correcciones tuyas, <b>reference</b> punteros a recursos externos.</p>
+  </div>
+
+  <div class="foot only-s">
     <p>Los títulos los genera Claude durante la sesión. Cuando falta, cae al primer mensaje tuyo — y ahí se nota, porque arranca en minúscula o suena a pregunta suelta.</p>
     <p><b>Vacía</b> es una sesión que se abrió pero nunca recibió un mensaje: un <code>/resume</code> cancelado, un <code>/login</code>. <b>No interactiva</b> es un <code>claude -p</code> con algo piped por stdin — típicamente un <code>git diff</code> para redactar el mensaje de commit, no un chat.</p>
     <p>La transcripción trae el texto de la conversación y una línea por herramienta usada, pero no lo que esas herramientas devolvieron: son el 95 % del volumen en disco.</p>
@@ -660,18 +834,30 @@
 
 <script id="payload" type="application/json">__DATA__</script>
 <script>
-const DATA = JSON.parse(document.getElementById('payload').textContent);
+const PAYLOAD = JSON.parse(document.getElementById('payload').textContent);
+const DATA = PAYLOAD.s || [];
+const MEM = PAYLOAD.m || [];
 // Instantánea = la actividad más reciente de los datos, para que "hoy" siga siendo
 // cierto respecto de cuándo se leyeron los logs y no del reloj de quien mira.
-const NOW = new Date(Math.max(...DATA.map(d => +new Date(d.l))));
+const NOW = new Date(Math.max(
+  ...DATA.map(d => +new Date(d.l)), ...MEM.map(m => +new Date(m.l))));
 const BY_ID = new Map(DATA.map(d => [d.id, d]));
+const BY_NAME = new Map(MEM.map(m => [m.name, m]));
+// Los enlaces [[...]] pueden apuntar al nombre declarado o al del archivo.
+MEM.forEach(m => { const f = m.file.replace(/\.md$/, ''); if (!BY_NAME.has(f)) BY_NAME.set(f, m); });
 
 const $ = s => document.querySelector(s);
 const rowsEl = $('#rows'), qEl = $('#q'), projEl = $('#proj'), deepEl = $('#deep'),
       emptyEl = $('#hideEmpty'), countEl = $('#count'), toastEl = $('#toast'),
-      readerEl = $('#reader'), scrimEl = $('#scrim'), bodyEl = $('#rBody');
+      readerEl = $('#reader'), scrimEl = $('#scrim'), bodyEl = $('#rBody'),
+      typeEl = $('#mtype'), unlistedEl = $('#unlisted');
 
-let sortKey = 'l', sortDir = -1, openId = null, lastFocus = null;
+let sortKey = 'l', sortDir = -1, lastFocus = null;
+let mSortKey = 'l', mSortDir = -1;
+// Qué hay abierto en el lector: {kind: 's'|'m', key} o null.
+let open_ = null;
+// Sin memorias la pestaña no aporta nada, así que arrancamos siempre en sesiones.
+let mode = 's';
 
 /* ---------- formato ---------- */
 
@@ -723,7 +909,7 @@ function mark(text, q) {
 // Markdown mínimo: código, negritas y títulos. Los saltos los resuelve pre-wrap.
 // El código se guarda aparte antes de tocar negritas, para que un ** dentro de
 // un bloque de código quede tal cual.
-function renderBody(text) {
+function renderBody(text, wikilinks) {
   const stash = [];
   // Tras esc() no queda ningún "<" crudo en el texto: todos son &lt;. Por eso un
   // marcador con "<" no puede colisionar con el contenido del mensaje.
@@ -735,6 +921,16 @@ function renderBody(text) {
   out = out.replace(/`([^`\n]+)`/g, (_, code) => keep(`<code>${code}</code>`));
   out = out.replace(/^#{1,6}\s+(.+)$/gm, '<b class="h">$1</b>');
   out = out.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
+  if (wikilinks) {
+    // Va acá adentro, con el código ya guardado aparte: un [[...]] dentro de un
+    // bloque de código tiene que quedar como texto.
+    out = out.replace(/\[\[([^\]\n]+)\]\]/g, (_, name) => {
+      const hit = BY_NAME.get(name);
+      return hit
+        ? `<button type="button" class="wl" data-wl="${esc(hit.name)}">${esc(name)}</button>`
+        : `<span class="wl dead" title="todavía no existe una memoria con ese nombre">${esc(name)}</span>`;
+    });
+  }
 
   return out.replace(/<K(\d+)>/g, (_, i) => stash[i]);
 }
@@ -752,16 +948,30 @@ function renderBody(text) {
     ['tus mensajes', msgs, ''],
     ['en disco', mb.toFixed(1), ' MB'],
     ['período', `${pad(f.getDate())} ${MES[f.getMonth()]} – ${pad(l.getDate())} ${MES[l.getMonth()]}`, ''],
+    ['memorias', MEM.length, ''],
   ].map(([k, v, s]) => `<div class="stat"><span class="stat-k">${k}</span><span class="stat-v">${v}${s ? `<small>${s}</small>` : ''}</span></div>`).join('');
 })();
 
-(function projects() {
+function fillProjects() {
+  const src = mode === 'm' ? MEM : DATA;
   const counts = {};
-  DATA.forEach(d => counts[d.p] = (counts[d.p] || 0) + 1);
-  projEl.innerHTML = `<option value="">todos los proyectos (${DATA.length})</option>` +
+  src.forEach(d => counts[d.p] = (counts[d.p] || 0) + 1);
+  const label = mode === 'm' ? 'memorias' : 'sesiones';
+  projEl.innerHTML = `<option value="">todos los proyectos (${src.length} ${label})</option>` +
     Object.entries(counts).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
       .map(([p, n]) => `<option value="${esc(p)}">${esc(p)} · ${n}</option>`).join('');
+}
+
+(function types() {
+  const counts = {};
+  MEM.forEach(m => counts[m.ty] = (counts[m.ty] || 0) + 1);
+  typeEl.innerHTML = `<option value="">todos los tipos (${MEM.length})</option>` +
+    Object.entries(counts).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([t, n]) => `<option value="${esc(t)}">${esc(t)} · ${n}</option>`).join('');
 })();
+
+$('#nS').textContent = DATA.length;
+$('#nM').textContent = MEM.length;
 
 /* ---------- lista ---------- */
 
@@ -808,7 +1018,7 @@ function current() {
   return list;
 }
 
-function render() {
+function renderSessions() {
   const list = current();
   const q = qEl.value.trim();
   const ql = q.toLowerCase();
@@ -854,15 +1064,99 @@ function render() {
     : `${list.length} de ${DATA.length} sesiones`;
 }
 
+/* ---------- memorias ---------- */
+
+function currentMem() {
+  const q = qEl.value.trim().toLowerCase();
+  const proj = projEl.value, ty = typeEl.value;
+
+  const list = MEM.filter(m => {
+    if (proj && m.p !== proj) return false;
+    if (ty && m.ty !== ty) return false;
+    if (unlistedEl.checked && m.ix) return false;
+    if (!q) return true;
+    return m.name.toLowerCase().includes(q)
+        || m.desc.toLowerCase().includes(q)
+        || m.p.toLowerCase().includes(q)
+        || m.body.toLowerCase().includes(q);
+  });
+
+  list.sort((a, b) => {
+    const k = mSortKey;
+    if (k === 'l') return (new Date(a.l) - new Date(b.l)) * mSortDir;
+    const av = String(a[k]).toLowerCase(), bv = String(b[k]).toLowerCase();
+    return av < bv ? -mSortDir : av > bv ? mSortDir : 0;
+  });
+  return list;
+}
+
+function renderMem() {
+  const list = currentMem();
+  const q = qEl.value.trim();
+
+  if (!list.length) {
+    rowsEl.innerHTML = `<div class="none">Ninguna memoria coincide con ese filtro.</div>`;
+    countEl.textContent = '';
+    return;
+  }
+
+  rowsEl.innerHTML = list.map(m => `
+    <div class="row mem clickable" role="row" data-mem="${esc(m.name)}" tabindex="0">
+      <div class="stripe" style="--stripe:${stripeFor(m.l)}"></div>
+      <div class="r-body">
+        <div class="mem-name">
+          <span class="nm">${mark(m.name, q)}</span>
+          ${m.ix ? '' : '<span class="chip chip-unlisted">fuera del índice</span>'}
+        </div>
+        ${m.desc ? `<p class="mem-desc">${mark(m.desc, q)}</p>` : ''}
+      </div>
+      <div class="cell-ty"><span class="ty ty-${esc(m.ty)}">${esc(m.ty)}</span></div>
+      <div class="cell-proj meta"><span class="path" title="${esc(m.p)}">${mark(m.p, q)}</span></div>
+      <div class="cell-date">${fmtDate(m.l)}<small>${fmtRel(m.l)}</small></div>
+    </div>`).join('');
+
+  countEl.textContent = list.length === MEM.length
+    ? `${MEM.length} memorias · clic en una para leerla`
+    : `${list.length} de ${MEM.length} memorias`;
+}
+
+function render() {
+  return mode === 'm' ? renderMem() : renderSessions();
+}
+
+function setMode(next) {
+  if (next === mode) return;
+  mode = next;
+  document.body.dataset.mode = mode;
+  document.querySelectorAll('.tab').forEach(t =>
+    t.setAttribute('aria-selected', String(t.dataset.mode === mode)));
+  qEl.placeholder = mode === 'm'
+    ? 'buscar nombre, descripción o contenido…  (/)'
+    : 'buscar título, ruta o uuid…  (/)';
+  // Los filtros son de otro conjunto: arrastrarlos entre pestañas confunde.
+  projEl.value = '';
+  fillProjects();
+  render();
+}
+
 /* ---------- lector ---------- */
 
 const WHO = { u: 'vos', a: 'claude' };
 
-function openReader(id) {
+function showReader() {
+  bodyEl.scrollTop = 0;
+  scrimEl.classList.add('open');
+  readerEl.classList.add('open');
+  document.body.classList.add('locked');
+  readerEl.focus();
+}
+
+function openChat(id) {
   const d = BY_ID.get(id);
   if (!d || d.e) return;
-  openId = id;
+  open_ = { kind: 's', key: id };
   lastFocus = document.activeElement;
+  $('#rCopy').hidden = false;
 
   $('#rTitle').textContent = d.t || 'Sesión sin título';
   $('#rMeta').innerHTML = [
@@ -881,17 +1175,54 @@ function openReader(id) {
     : `<p class="reader-empty">Esta sesión no tiene mensajes.</p>`;
 
   if (location.hash.slice(1) !== id) history.replaceState(null, '', '#' + id);
+  showReader();
+}
 
-  bodyEl.scrollTop = 0;
-  scrimEl.classList.add('open');
-  readerEl.classList.add('open');
-  document.body.classList.add('locked');
-  readerEl.focus();
+function openMemory(name) {
+  const m = BY_NAME.get(name);
+  if (!m) return;
+  open_ = { kind: 'm', key: m.name };
+  lastFocus = document.activeElement;
+  // El botón de copiar reanuda una sesión: en una memoria no aplica.
+  $('#rCopy').hidden = true;
+
+  $('#rTitle').textContent = m.name;
+  $('#rMeta').innerHTML = [
+    `<span class="ty ty-${esc(m.ty)}">${esc(m.ty)}</span>`,
+    `<span class="path">${esc(m.p)}</span>`,
+    `<span>${fmtDate(m.l)} · ${fmtTime(m.l)}</span>`,
+    `<span>${m.k} KB</span>`,
+    m.ix ? '' : '<span class="chip chip-unlisted">fuera del índice</span>',
+  ].filter(Boolean).join('');
+
+  const origen = BY_ID.get(m.src);
+  const pie = [];
+  if (m.desc) pie.push(`<div><span class="lbl">descripción</span>${esc(m.desc)}</div>`);
+  pie.push(`<div><span class="lbl">archivo</span>${esc(m.file)}</div>`);
+  if (!m.ix) {
+    pie.push(`<div>${m.hix
+      ? 'No figura en MEMORY.md: sigue en disco, pero no se carga en contexto.'
+      : 'Este proyecto no tiene MEMORY.md, así que no se carga ninguna de sus memorias.'}</div>`);
+  }
+  if (m.src) {
+    pie.push(origen
+      ? `<button type="button" class="jump" data-chat="${esc(m.src)}">↩ la escribió esta sesión: ${esc(origen.t || m.src.slice(0, 8))}</button>`
+      : `<div><span class="lbl">la escribió</span>la sesión ${esc(m.src.slice(0, 8))}, que ya no está en disco</div>`);
+  }
+
+  bodyEl.innerHTML = `<div class="mem-body">${renderBody(m.body, true)}</div>`
+    + `<div class="mem-foot">${pie.join('')}</div>`;
+
+  const hash = 'm:' + m.name;
+  if (decodeURIComponent(location.hash.slice(1)) !== hash) {
+    history.replaceState(null, '', '#' + encodeURIComponent(hash));
+  }
+  showReader();
 }
 
 function closeReader() {
-  if (!openId) return;
-  openId = null;
+  if (!open_) return;
+  open_ = null;
   if (location.hash) history.replaceState(null, '', location.pathname + location.search);
   scrimEl.classList.remove('open');
   readerEl.classList.remove('open');
@@ -900,8 +1231,14 @@ function closeReader() {
 }
 
 function openFromHash() {
-  const id = decodeURIComponent(location.hash.slice(1));
-  if (id && BY_ID.has(id)) openReader(id);
+  const ref = decodeURIComponent(location.hash.slice(1));
+  if (!ref) return;
+  if (ref.startsWith('m:')) {
+    const name = ref.slice(2);
+    if (BY_NAME.has(name)) { setMode('m'); openMemory(name); }
+  } else if (BY_ID.has(ref)) {
+    openChat(ref);
+  }
 }
 
 // El diálogo es aria-modal: el foco tiene que quedar adentro mientras está abierto.
@@ -962,7 +1299,9 @@ rowsEl.addEventListener('click', e => {
     return;
   }
   const row = e.target.closest('.row.clickable');
-  if (row) openReader(row.dataset.id);
+  if (!row) return;
+  if (row.dataset.mem) openMemory(row.dataset.mem);
+  else openChat(row.dataset.id);
 });
 
 rowsEl.addEventListener('keydown', e => {
@@ -970,20 +1309,31 @@ rowsEl.addEventListener('keydown', e => {
   const row = e.target.closest('.row.clickable');
   if (!row || e.target.closest('[data-copy]')) return;
   e.preventDefault();
-  openReader(row.dataset.id);
+  if (row.dataset.mem) openMemory(row.dataset.mem);
+  else openChat(row.dataset.id);
+});
+
+// Dentro del lector: enlaces [[...]] entre memorias y salto a la sesión de origen.
+bodyEl.addEventListener('click', e => {
+  const wl = e.target.closest('[data-wl]');
+  if (wl) { openMemory(wl.dataset.wl); return; }
+  const jump = e.target.closest('[data-chat]');
+  if (jump) { setMode('s'); openChat(jump.dataset.chat); }
 });
 
 $('#rClose').addEventListener('click', closeReader);
 scrimEl.addEventListener('click', closeReader);
-$('#rCopy').addEventListener('click', e => copyFor(BY_ID.get(openId), e.currentTarget));
+$('#rCopy').addEventListener('click', e => {
+  if (open_ && open_.kind === 's') copyFor(BY_ID.get(open_.key), e.currentTarget);
+});
 
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
-    if (openId) closeReader();
+    if (open_) closeReader();
     else if (document.activeElement === qEl && qEl.value) { qEl.value = ''; render(); }
     return;
   }
-  if (openId) return;
+  if (open_) return;
   const typing = /^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName);
   if ((e.key === '/' && !typing) || (e.key.toLowerCase() === 'k' && (e.metaKey || e.ctrlKey))) {
     e.preventDefault();
@@ -1011,10 +1361,32 @@ document.querySelectorAll('[data-sort]').forEach(btn => {
 });
 document.querySelector('[data-sort="l"]').setAttribute('aria-sort', 'descending');
 
+document.querySelectorAll('[data-msort]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const k = btn.dataset.msort;
+    if (mSortKey === k) mSortDir = -mSortDir;
+    else { mSortKey = k; mSortDir = k === 'l' ? -1 : 1; }
+    document.querySelectorAll('[data-msort]').forEach(b => b.removeAttribute('aria-sort'));
+    btn.setAttribute('aria-sort', mSortDir === 1 ? 'ascending' : 'descending');
+    btn.querySelector('.car').textContent = mSortDir === 1 ? '▴' : '▾';
+    render();
+  });
+});
+document.querySelector('[data-msort="l"]').setAttribute('aria-sort', 'descending');
+
+document.querySelectorAll('.tab').forEach(t =>
+  t.addEventListener('click', () => setMode(t.dataset.mode)));
+
+// Sin memorias la pestaña no tiene nada que mostrar.
+if (!MEM.length) document.querySelector('.tab[data-mode="m"]').hidden = true;
+
 $('#snap').textContent = `Instantánea leída el ${pad(NOW.getDate())} ${MES[NOW.getMonth()]} ${NOW.getFullYear()} a las ${fmtTime(NOW.toISOString())}. Las fechas relativas son respecto de ese momento; volvé a correr claude-sesiones --html para actualizarla.`;
 
-[qEl, projEl, deepEl, emptyEl].forEach(el => el.addEventListener(el === qEl ? 'input' : 'change', render));
+[qEl, projEl, deepEl, emptyEl, typeEl, unlistedEl].forEach(
+  el => el.addEventListener(el === qEl ? 'input' : 'change', render));
 
+document.body.dataset.mode = mode;
+fillProjects();
 render();
 openFromHash();
 </script>

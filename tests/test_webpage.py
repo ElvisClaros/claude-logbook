@@ -14,12 +14,20 @@ REGISTRO = {"id": "abc", "p": "/proj", "u": 1, "c": [{"r": "u", "x": "hola"}]}
 
 class TestPayload(unittest.TestCase):
     def test_escapa_el_cierre_de_etiqueta(self):
-        raw = webpage.encode_payload([{"x": "mirá este </script> de acá"}])
+        raw = webpage.encode_payload({"s": [{"x": "mirá este </script> de acá"}]})
         self.assertNotIn("</", raw)
-        self.assertEqual(json.loads(raw)[0]["x"], "mirá este </script> de acá")
+        self.assertEqual(json.loads(raw)["s"][0]["x"], "mirá este </script> de acá")
 
     def test_no_escapa_a_ascii(self):
-        self.assertIn("ñ", webpage.encode_payload([{"x": "año"}]))
+        self.assertIn("ñ", webpage.encode_payload({"s": [{"x": "año"}]}))
+
+    def test_separa_sesiones_de_memorias(self):
+        payload = webpage.build_payload([REGISTRO], [{"name": "algo"}])
+        self.assertEqual(payload["s"], [REGISTRO])
+        self.assertEqual(payload["m"], [{"name": "algo"}])
+
+    def test_sin_memorias_igual_trae_la_clave(self):
+        self.assertEqual(webpage.build_payload([REGISTRO])["m"], [])
 
 
 class TestRender(unittest.TestCase):
@@ -45,7 +53,8 @@ class TestRender(unittest.TestCase):
         bloques = PAYLOAD_RE.findall(html)
         self.assertEqual(len(bloques), 1)
         vuelta = json.loads(bloques[0])
-        self.assertEqual(vuelta[0]["c"][0]["x"], "poné </script><img> y __DATA__")
+        self.assertEqual(vuelta["s"][0]["c"][0]["x"],
+                         "poné </script><img> y __DATA__")
 
 
 class TestTemplate(unittest.TestCase):
@@ -83,7 +92,8 @@ class TestWrite(unittest.TestCase):
             stats = webpage.write(
                 [REGISTRO, dict(REGISTRO, id="def", p="/otro", u=2)], out)
             self.assertEqual(stats, {"sesiones": 2, "proyectos": 2,
-                                     "mensajes": 3, "bloques": 2})
+                                     "mensajes": 3, "bloques": 2,
+                                     "memorias": 0})
             with open(out, encoding="utf-8") as f:
                 self.assertEqual(len(PAYLOAD_RE.findall(f.read())), 1)
 

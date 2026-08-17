@@ -138,5 +138,81 @@ class TestSalida(unittest.TestCase):
             "cd /a b && claude --resume xyz")
 
 
+class TestMemorias(unittest.TestCase):
+    def memoria(self, **kw):
+        m = {
+            "name": "deploy-docker", "file": "deploy-docker.md",
+            "p": "/home/u/proj", "desc": "Cómo se despliega", "ty": "project",
+            "src": "abcdef01-2345-6789-abcd-ef0123456789",
+            "body": "Se despliega con `make up`.", "ln": ["roles-db"],
+            "k": 1.2, "l": ago(1), "ix": True, "hix": True,
+        }
+        m.update(kw)
+        return m
+
+    def test_tabla_sin_color_no_tiene_ansi(self):
+        buf = io.StringIO()
+        T.print_memories([self.memoria()], T.Style(False), NOW, buf, width=120)
+        out = buf.getvalue()
+        self.assertNotIn("\x1b", out)
+        self.assertEqual(len(out.strip().split("\n")), 2)
+        self.assertIn("deploy-docker", out)
+        self.assertIn("project", out)
+        self.assertIn("Cómo se despliega", out)
+
+    def test_tabla_angosta_esconde_columnas(self):
+        buf = io.StringIO()
+        T.print_memories([self.memoria()], T.Style(False), NOW, buf, width=70)
+        out = buf.getvalue()
+        self.assertIn("deploy-docker", out)
+        self.assertNotIn("Cómo se despliega", out)
+
+    def test_marca_las_que_no_estan_en_el_indice(self):
+        buf = io.StringIO()
+        T.print_memories([self.memoria(ix=False)], T.Style(False), NOW, buf,
+                         width=120)
+        self.assertIn("*", buf.getvalue())
+
+    def test_lectura_trae_cuerpo_enlaces_y_origen(self):
+        buf = io.StringIO()
+        T.print_memory(self.memoria(), T.Style(False), buf, path="/x/y.md")
+        out = buf.getvalue()
+        self.assertIn("Se despliega con", out)
+        self.assertIn("roles-db", out)
+        self.assertIn("abcdef01", out)
+        self.assertIn("/x/y.md", out)
+
+    def test_lectura_avisa_si_no_esta_indexada(self):
+        buf = io.StringIO()
+        T.print_memory(self.memoria(ix=False), T.Style(False), buf)
+        self.assertIn("no figura en MEMORY.md", buf.getvalue())
+
+    def test_lectura_avisa_si_el_proyecto_no_tiene_indice(self):
+        buf = io.StringIO()
+        T.print_memory(self.memoria(ix=False, hix=False), T.Style(False), buf)
+        self.assertIn("no tiene MEMORY.md", buf.getvalue())
+
+    def test_auditoria_vacia_no_imprime_nada(self):
+        buf = io.StringIO()
+        total = T.print_audit({}, T.Style(False), buf)
+        self.assertEqual(total, 0)
+        self.assertEqual(buf.getvalue(), "")
+
+    def test_auditoria_cuenta_todos_los_bloques(self):
+        buf = io.StringIO()
+        m = self.memoria()
+        total = T.print_audit({
+            "sin_indice": [m],
+            "sin_listar": [m],
+            "indice_fantasma": [("-p", "fantasma")],
+            "enlaces_rotos": [(m, "roto")],
+            "origen_perdido": [m],
+        }, T.Style(False), buf)
+        out = buf.getvalue()
+        self.assertEqual(total, 5)
+        self.assertIn("fantasma", out)
+        self.assertIn("[[roto]]", out)
+
+
 if __name__ == "__main__":
     unittest.main()
