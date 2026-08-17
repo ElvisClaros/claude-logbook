@@ -31,8 +31,6 @@ Issues = "https://github.com/ElvisClaros/claude-logbook/issues"
 
 [project.scripts]
 claude-logbook = "claude_logbook.cli:main"
-# El nombre viejo sigue andando, para no rehacer la memoria muscular.
-claude-sesiones = "claude_logbook.cli:main"
 
 [tool.setuptools]
 packages = ["claude_logbook"]

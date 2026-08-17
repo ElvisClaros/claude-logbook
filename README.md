@@ -50,9 +50,6 @@ git clone https://github.com/ElvisClaros/claude-logbook && cd claude-logbook
 python3 -m claude_logbook          # no install needed
 ```
 
-The command is `claude-logbook`. `claude-sesiones`, the name this had before,
-still works as an alias.
-
 ## Usage
 
 ```bash
