@@ -32,17 +32,22 @@ ya excluye `sesiones.html` y `data.json`, pero el archivo lo cuidás vos.
 Necesita Python 3.9 o más nuevo. Nada más.
 
 ```bash
-pipx install git+https://github.com/ElvisClaros/claude-logbook
+pipx install claude-logbook
 ```
 
-O con pip, o directamente desde un clon:
+O con pip, o desde el último commit, o directamente desde un clon:
 
 ```bash
-pip install git+https://github.com/ElvisClaros/claude-logbook
+pip install claude-logbook
+
+pipx install git+https://github.com/ElvisClaros/claude-logbook   # sin publicar
 
 git clone https://github.com/ElvisClaros/claude-logbook && cd claude-logbook
 python3 -m claude_logbook          # sin instalar nada
 ```
+
+El comando es `claude-logbook`. `claude-sesiones`, como se llamaba antes,
+sigue funcionando como alias.
 
 ## Uso
 

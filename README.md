@@ -36,17 +36,22 @@ the file itself is yours to look after.
 Requires Python 3.9 or newer. Nothing else.
 
 ```bash
-pipx install git+https://github.com/ElvisClaros/claude-logbook
+pipx install claude-logbook
 ```
 
-Or with pip, or straight from a clone:
+Or with pip, from the latest commit, or straight from a clone:
 
 ```bash
-pip install git+https://github.com/ElvisClaros/claude-logbook
+pip install claude-logbook
+
+pipx install git+https://github.com/ElvisClaros/claude-logbook   # unreleased
 
 git clone https://github.com/ElvisClaros/claude-logbook && cd claude-logbook
 python3 -m claude_logbook          # no install needed
 ```
+
+The command is `claude-logbook`. `claude-sesiones`, the name this had before,
+still works as an alias.
 
 ## Usage
 
