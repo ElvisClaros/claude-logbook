@@ -1,6 +1,6 @@
-"""Explorador de las sesiones que Claude Code guarda en ~/.claude/projects/.
+"""Browser for the sessions Claude Code stores in ~/.claude/projects/.
 
-Sin dependencias: solo la biblioteca estándar.
+No dependencies: standard library only.
 """
 
 __version__ = "1.1.0"

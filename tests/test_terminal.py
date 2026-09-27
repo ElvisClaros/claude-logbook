@@ -8,17 +8,17 @@ NOW = datetime(2025, 8, 14, 12, 0, tzinfo=timezone.utc)
 
 
 def ago(days):
-    """Un ISO que queda a `days` días de NOW."""
+    """An ISO timestamp `days` days away from NOW."""
     return (NOW - timedelta(days=days)).isoformat()
 
 
 class TestStyle(unittest.TestCase):
-    def test_apagado_no_emite_nada(self):
+    def test_off_emits_nothing(self):
         st = T.Style(False)
         self.assertEqual(st.amber, "")
         self.assertEqual(st.reset, "")
 
-    def test_prendido_emite_ansi(self):
+    def test_on_emits_ansi(self):
         st = T.Style(True)
         self.assertTrue(st.amber.startswith("\x1b["))
 
@@ -30,7 +30,7 @@ class TestStyle(unittest.TestCase):
         self.assertFalse(T.Style.from_stream(io.StringIO()).on)
 
 
-class TestFormato(unittest.TestCase):
+class TestFormatting(unittest.TestCase):
     def test_fmt_dur(self):
         self.assertEqual(T.fmt_dur(None), "—")
         self.assertEqual(T.fmt_dur(0), "<1m")
@@ -54,20 +54,20 @@ class TestFormato(unittest.TestCase):
         self.assertEqual(T.clip("hola mundo", 6), "hola …")
         self.assertEqual(T.clip("con\nsalto", 20), "con salto")
 
-    def test_visible_len_ignora_los_codigos_ansi(self):
+    def test_visible_len_ignores_ansi_codes(self):
         self.assertEqual(T.visible_len("\x1b[1mhola\x1b[0m"), 4)
 
     def test_plural(self):
         self.assertEqual(T.plural(1, "sesión", "sesiones"), "1 sesión")
         self.assertEqual(T.plural(2, "sesión", "sesiones"), "2 sesiones")
 
-    def test_stripe_sin_color_es_una_barra(self):
+    def test_stripe_without_color_is_a_bar(self):
         self.assertEqual(T.stripe(ago(1), NOW, T.Style(False)), "|")
 
-    def test_stripe_cambia_de_color_con_la_edad(self):
+    def test_stripe_changes_color_with_age(self):
         st = T.Style(True)
-        colores = {T.stripe(ago(d), NOW, st) for d in (1, 4, 10, 60)}
-        self.assertEqual(len(colores), 4)
+        use_colors = {T.stripe(ago(d), NOW, st) for d in (1, 4, 10, 60)}
+        self.assertEqual(len(use_colors), 4)
 
 
 class TestMarkdown(unittest.TestCase):
@@ -75,20 +75,20 @@ class TestMarkdown(unittest.TestCase):
         self.assertEqual(T.strip_md("## Título"), "Título")
         self.assertEqual(T.strip_md("esto es **fuerte**"), "esto es fuerte")
 
-    def test_render_block_respeta_las_cercas(self):
+    def test_render_block_respects_fences(self):
         st = T.Style(False)
         out = T.render_block("texto\n```py\nx = 1\n```\nfin", st, 40, "")
         self.assertIn("  texto", out)
         self.assertIn("  x = 1", out)
         self.assertNotIn("```py", "".join(out))
 
-    def test_render_block_no_parte_palabras_largas(self):
+    def test_render_block_does_not_split_long_words(self):
         out = T.render_block("a" * 60, T.Style(False), 20, "")
         self.assertEqual(out, ["  " + "a" * 60])
 
 
-class TestSalida(unittest.TestCase):
-    def sesion(self, **kw):
+class TestOutput(unittest.TestCase):
+    def session_item(self, **kw):
         s = {
             "id": "abcdef01-2345-6789-abcd-ef0123456789",
             "p": "/home/u/proj", "b": "main", "t": "Arreglar el build",
@@ -102,34 +102,34 @@ class TestSalida(unittest.TestCase):
 
     def test_print_table_sin_color_no_tiene_ansi(self):
         buf = io.StringIO()
-        T.print_table([self.sesion()], T.Style(False), NOW, buf, width=120)
+        T.print_table([self.session_item()], T.Style(False), NOW, buf, width=120)
         out = buf.getvalue()
         self.assertNotIn("\x1b", out)
-        self.assertEqual(len(out.strip().split("\n")), 2)  # encabezado + 1 fila
+        self.assertEqual(len(out.strip().split("\n")), 2)  # header + 1 row
         self.assertIn("Arreglar el build", out)
         self.assertIn("abcdef01", out)
 
-    def test_print_table_angosta_esconde_columnas(self):
+    def test_narrow_print_table_hides_columns(self):
         buf = io.StringIO()
-        T.print_table([self.sesion()], T.Style(False), NOW, buf, width=60)
+        T.print_table([self.session_item()], T.Style(False), NOW, buf, width=60)
         self.assertNotIn("/home/u/proj", buf.getvalue())
 
-    def test_print_chat_incluye_el_comando_para_reanudar(self):
+    def test_print_chat_includes_the_resume_command(self):
         buf = io.StringIO()
-        T.print_chat(self.sesion(), T.Style(False), buf)
+        T.print_chat(self.session_item(), T.Style(False), buf)
         out = buf.getvalue()
         self.assertIn("cd /home/u/proj && claude --resume abcdef01", out)
         self.assertIn("hola", out)
         self.assertIn("Bash: ls", out)
 
-    def test_no_tools_saca_las_herramientas(self):
+    def test_no_tools_removes_the_tools(self):
         buf = io.StringIO()
-        T.print_chat(self.sesion(), T.Style(False), buf, show_tools=False)
+        T.print_chat(self.session_item(), T.Style(False), buf, show_tools=False)
         self.assertNotIn("Bash: ls", buf.getvalue())
 
-    def test_una_sesion_vacia_lo_dice(self):
+    def test_empty_session_says_so(self):
         buf = io.StringIO()
-        T.print_chat(self.sesion(c=[], t=None), T.Style(False), buf)
+        T.print_chat(self.session_item(c=[], t=None), T.Style(False), buf)
         self.assertIn("no tiene mensajes", buf.getvalue())
 
     def test_resume_cmd(self):
@@ -138,8 +138,8 @@ class TestSalida(unittest.TestCase):
             "cd /a b && claude --resume xyz")
 
 
-class TestMemorias(unittest.TestCase):
-    def memoria(self, **kw):
+class TestMemories(unittest.TestCase):
+    def memory_item(self, **kw):
         m = {
             "name": "deploy-docker", "file": "deploy-docker.md",
             "p": "/home/u/proj", "desc": "Cómo se despliega", "ty": "project",
@@ -152,7 +152,7 @@ class TestMemorias(unittest.TestCase):
 
     def test_tabla_sin_color_no_tiene_ansi(self):
         buf = io.StringIO()
-        T.print_memories([self.memoria()], T.Style(False), NOW, buf, width=120)
+        T.print_memories([self.memory_item()], T.Style(False), NOW, buf, width=120)
         out = buf.getvalue()
         self.assertNotIn("\x1b", out)
         self.assertEqual(len(out.strip().split("\n")), 2)
@@ -160,47 +160,47 @@ class TestMemorias(unittest.TestCase):
         self.assertIn("project", out)
         self.assertIn("Cómo se despliega", out)
 
-    def test_tabla_angosta_esconde_columnas(self):
+    def test_narrow_table_hides_columns(self):
         buf = io.StringIO()
-        T.print_memories([self.memoria()], T.Style(False), NOW, buf, width=70)
+        T.print_memories([self.memory_item()], T.Style(False), NOW, buf, width=70)
         out = buf.getvalue()
         self.assertIn("deploy-docker", out)
         self.assertNotIn("Cómo se despliega", out)
 
-    def test_marca_las_que_no_estan_en_el_indice(self):
+    def test_marks_the_ones_missing_from_the_index(self):
         buf = io.StringIO()
-        T.print_memories([self.memoria(ix=False)], T.Style(False), NOW, buf,
+        T.print_memories([self.memory_item(ix=False)], T.Style(False), NOW, buf,
                          width=120)
         self.assertIn("*", buf.getvalue())
 
-    def test_lectura_trae_cuerpo_enlaces_y_origen(self):
+    def test_reading_brings_body_links_and_origin(self):
         buf = io.StringIO()
-        T.print_memory(self.memoria(), T.Style(False), buf, path="/x/y.md")
+        T.print_memory(self.memory_item(), T.Style(False), buf, path="/x/y.md")
         out = buf.getvalue()
         self.assertIn("Se despliega con", out)
         self.assertIn("roles-db", out)
         self.assertIn("abcdef01", out)
         self.assertIn("/x/y.md", out)
 
-    def test_lectura_avisa_si_no_esta_indexada(self):
+    def test_reading_warns_if_not_indexed(self):
         buf = io.StringIO()
-        T.print_memory(self.memoria(ix=False), T.Style(False), buf)
+        T.print_memory(self.memory_item(ix=False), T.Style(False), buf)
         self.assertIn("no figura en MEMORY.md", buf.getvalue())
 
-    def test_lectura_avisa_si_el_proyecto_no_tiene_indice(self):
+    def test_reading_warns_if_the_project_has_no_index(self):
         buf = io.StringIO()
-        T.print_memory(self.memoria(ix=False, hix=False), T.Style(False), buf)
+        T.print_memory(self.memory_item(ix=False, hix=False), T.Style(False), buf)
         self.assertIn("no tiene MEMORY.md", buf.getvalue())
 
-    def test_auditoria_vacia_no_imprime_nada(self):
+    def test_empty_audit_prints_nothing(self):
         buf = io.StringIO()
         total = T.print_audit({}, T.Style(False), buf)
         self.assertEqual(total, 0)
         self.assertEqual(buf.getvalue(), "")
 
-    def test_auditoria_cuenta_todos_los_bloques(self):
+    def test_audit_counts_every_block(self):
         buf = io.StringIO()
-        m = self.memoria()
+        m = self.memory_item()
         total = T.print_audit({
             "sin_indice": [m],
             "sin_listar": [m],

@@ -23,7 +23,7 @@ class TempRoot(unittest.TestCase):
 
 
 class TestReadSession(TempRoot):
-    def test_conversacion_basica(self):
+    def test_basic_conversation(self):
         path = write_session(self.root, "-p", "11111111-1111-1111-1111-111111111111", [
             user("¿por qué falla?", at=ts(0)),
             assistant("Miro.", tools=[("Bash", {"command": "make test"})], at=ts(5)),
@@ -41,7 +41,7 @@ class TestReadSession(TempRoot):
         self.assertEqual([m["r"] for m in rec["c"]], ["u", "a", "t"])
         self.assertEqual(rec["c"][2]["x"], "Bash: make test")
 
-    def test_el_titulo_de_claude_le_gana_al_primer_mensaje(self):
+    def test_claude_title_beats_the_first_message(self):
         path = write_session(self.root, "-p", "22222222-0000-0000-0000-000000000000", [
             user("arreglá esto", at=ts(0)),
             ai_title("Primer intento"),
@@ -51,7 +51,7 @@ class TestReadSession(TempRoot):
         self.assertEqual(rec["t"], "Título final")
         self.assertTrue(rec["ai"])
 
-    def test_ignora_el_ruido_del_harness(self):
+    def test_ignores_harness_noise(self):
         path = write_session(self.root, "-p", "33333333-0000-0000-0000-000000000000", [
             user("<command-name>/clear</command-name>", at=ts(0)),
             user("<system-reminder>ojo</system-reminder>", at=ts(1)),
@@ -65,7 +65,7 @@ class TestReadSession(TempRoot):
         self.assertEqual(rec["a"], 0)
         self.assertEqual(rec["c"][0]["x"], "texto real")
 
-    def test_tolera_una_linea_cortada_a_la_mitad(self):
+    def test_tolerates_a_line_cut_in_half(self):
         path = write_session(self.root, "-p", "44444444-0000-0000-0000-000000000000", [
             user("primero", at=ts(0)),
         ])
@@ -74,7 +74,7 @@ class TestReadSession(TempRoot):
         rec = S.read_session(path)
         self.assertEqual(rec["u"], 1)
 
-    def test_sesion_sin_mensajes(self):
+    def test_session_without_messages(self):
         path = write_session(self.root, "-p", "55555555-0000-0000-0000-000000000000", [
             {"type": "system", "timestamp": ts(0), "cwd": "/home/u/proj"},
         ])
@@ -83,14 +83,14 @@ class TestReadSession(TempRoot):
         self.assertIsNone(rec["t"])
         self.assertEqual(rec["c"], [])
 
-    def test_un_solo_mensaje_enorme_es_claude_p(self):
+    def test_single_huge_message_is_claude_p(self):
         largo = "x" * (S.NONINTERACTIVE_CHARS + 1)
         path = write_session(self.root, "-p", "66666666-0000-0000-0000-000000000000", [
             user(largo, at=ts(0)),
         ])
         self.assertTrue(S.read_session(path)["n"])
 
-    def test_una_charla_corta_no_es_claude_p(self):
+    def test_short_chat_is_not_claude_p(self):
         path = write_session(self.root, "-p", "77777777-0000-0000-0000-000000000000", [
             user("hola", at=ts(0)),
         ])
@@ -98,42 +98,42 @@ class TestReadSession(TempRoot):
 
 
 class TestToolSummary(unittest.TestCase):
-    def test_usa_el_parametro_representativo(self):
+    def test_uses_the_representative_parameter(self):
         self.assertEqual(
             S.tool_summary({"name": "Read", "input": {"file_path": "/a/b.py", "limit": 5}}),
             "Read: /a/b.py")
 
-    def test_cae_al_primer_string_si_la_tool_es_desconocida(self):
+    def test_falls_back_to_first_string_for_unknown_tool(self):
         self.assertEqual(
             S.tool_summary({"name": "Rara", "input": {"n": 1, "q": "algo"}}),
             "Rara: algo")
 
-    def test_recorta_los_argumentos_largos(self):
+    def test_truncates_long_arguments(self):
         out = S.tool_summary({"name": "Bash", "input": {"command": "a" * 500}})
         self.assertTrue(out.endswith("…"))
         self.assertEqual(len(out), len("Bash: ") + S.TOOL_ARG_MAX + 1)
 
-    def test_sin_argumentos_usables(self):
+    def test_no_usable_arguments(self):
         self.assertEqual(S.tool_summary({"name": "X", "input": {"n": 1}}), "X")
         self.assertEqual(S.tool_summary({"name": "X", "input": "no es dict"}), "X")
 
 
 class TestLoad(TempRoot):
-    def test_ordena_por_ultima_actividad(self):
+    def test_sorts_by_last_activity(self):
         simple_tree(self.root)
         got = [s["id"][:8] for s in self.load()]
         self.assertEqual(got, ["aaaaaaaa", "bbbbbbbb", "cccccccc"])
 
-    def test_deduce_la_ruta_de_otra_sesion_del_proyecto(self):
+    def test_infers_the_path_from_another_session_of_the_project(self):
         write_session(self.root, "-home-u-proj", "aaaaaaaa-0000-0000-0000-000000000001",
                       [user("con cwd", at=ts(0))])
         write_session(self.root, "-home-u-proj", "dddddddd-0000-0000-0000-000000000004",
                       [{"type": "system", "timestamp": ts(30)}])
-        huerfana = next(s for s in self.load() if s["id"].startswith("dddddddd"))
-        self.assertEqual(huerfana["p"], "/home/u/proj")
-        self.assertTrue(huerfana["i"])
+        orphan = next(s for s in self.load() if s["id"].startswith("dddddddd"))
+        self.assertEqual(orphan["p"], "/home/u/proj")
+        self.assertTrue(orphan["i"])
 
-    def test_sin_ninguna_ruta_conocida_queda_el_nombre_del_directorio(self):
+    def test_no_known_path_keeps_the_directory_name(self):
         write_session(self.root, "-sin-cwd", "eeeeeeee-0000-0000-0000-000000000005",
                       [{"type": "system", "timestamp": ts(0)}])
         s = self.load()[0]
@@ -150,12 +150,12 @@ class TestLoad(TempRoot):
 
 
 class TestCache(TempRoot):
-    def test_reusa_lo_que_no_cambio(self):
+    def test_reuses_what_did_not_change(self):
         simple_tree(self.root)
         self.load()
 
-        # Ensuciamos el caché a mano: si la segunda corrida devuelve el título
-        # falso es porque no volvió a leer el archivo.
+        # Dirty the cache by hand: if the second run returns the fake
+        # title, it did not read the file again.
         with open(self.cache, encoding="utf-8") as f:
             blob = json.load(f)
         for entry in blob["entries"].values():
@@ -165,7 +165,7 @@ class TestCache(TempRoot):
 
         self.assertEqual(self.load()[0]["t"], "vino del caché")
 
-    def test_reparsea_si_el_archivo_cambio(self):
+    def test_reparses_if_the_file_changed(self):
         path = write_session(self.root, "-p", "99999999-0000-0000-0000-000000000009",
                              [user("original", at=ts(0))])
         self.load()
@@ -174,7 +174,7 @@ class TestCache(TempRoot):
         self.assertEqual(self.load()[0]["u"], 2)
         self.assertTrue(os.path.exists(path))
 
-    def test_un_cache_de_otra_version_se_descarta(self):
+    def test_cache_from_another_version_is_discarded(self):
         simple_tree(self.root)
         self.load()
         with open(self.cache, encoding="utf-8") as f:
@@ -187,18 +187,18 @@ class TestCache(TempRoot):
 
         self.assertEqual(self.load()[0]["t"], "Arreglar el build")
 
-    def test_un_cache_roto_no_rompe_nada(self):
+    def test_broken_cache_breaks_nothing(self):
         simple_tree(self.root)
         with open(self.cache, "w", encoding="utf-8") as f:
             f.write("{esto no es json")
         self.assertEqual(len(self.load()), 3)
 
-    def test_no_cache_no_escribe_nada(self):
+    def test_no_cache_writes_nothing(self):
         simple_tree(self.root)
         self.load(use_cache=False)
         self.assertFalse(os.path.exists(self.cache))
 
-    def test_el_cache_guarda_la_ruta_sin_deducir(self):
+    def test_cache_stores_the_path_without_inferring(self):
         write_session(self.root, "-home-u-proj", "aaaaaaaa-0000-0000-0000-000000000001",
                       [user("con cwd", at=ts(0))])
         write_session(self.root, "-home-u-proj", "dddddddd-0000-0000-0000-000000000004",
@@ -209,7 +209,7 @@ class TestCache(TempRoot):
         recs = {os.path.basename(k): v["rec"] for k, v in blob["entries"].items()}
         self.assertIsNone(recs["dddddddd-0000-0000-0000-000000000004.jsonl"]["p"])
 
-    def test_drop_from_cache_saca_las_borradas(self):
+    def test_drop_from_cache_removes_deleted_ones(self):
         simple_tree(self.root)
         self.load()
         with open(self.cache, encoding="utf-8") as f:
@@ -219,26 +219,26 @@ class TestCache(TempRoot):
             self.assertEqual(len(json.load(f)["entries"]), len(paths) - 1)
 
 
-class TestFiltros(TempRoot):
+class TestFilters(TempRoot):
     def setUp(self):
         super().setUp()
         simple_tree(self.root)
         self.sessions = self.load()
 
-    def test_por_proyecto(self):
+    def test_by_project(self):
         out = S.apply_filters(self.sessions, project="/home/u/otro")
         self.assertEqual(len(out), 1)
 
-    def test_por_contenido_de_la_conversacion(self):
+    def test_by_conversation_content(self):
         out = S.apply_filters(self.sessions, grep="build")
         self.assertEqual([s["id"][:8] for s in out], ["aaaaaaaa"])
 
-    def test_por_titulo_ruta_rama_o_uuid(self):
+    def test_by_title_path_branch_or_uuid(self):
         self.assertEqual(len(S.apply_filters(self.sessions, query="arreglar")), 1)
         self.assertEqual(len(S.apply_filters(self.sessions, query="main")), 2)
         self.assertEqual(len(S.apply_filters(self.sessions, query="cccccccc")), 1)
 
-    def test_ocultar_vacias(self):
+    def test_hide_empty(self):
         out = S.apply_filters(self.sessions, hide_empty=True)
         self.assertTrue(all(not s["e"] for s in out))
         self.assertEqual(len(out), 2)
@@ -250,21 +250,21 @@ class TestPick(TempRoot):
         simple_tree(self.root)
         self.sessions = self.load()
 
-    def test_por_indice(self):
+    def test_by_index(self):
         self.assertEqual(S.pick(self.sessions, "1")["id"][:8], "aaaaaaaa")
 
-    def test_por_prefijo_de_uuid(self):
+    def test_by_uuid_prefix(self):
         self.assertEqual(S.pick(self.sessions, "cccc")["id"][:8], "cccccccc")
 
-    def test_indice_fuera_de_rango(self):
+    def test_index_out_of_range(self):
         with self.assertRaises(S.SessionError):
             S.pick(self.sessions, "99")
 
-    def test_prefijo_inexistente(self):
+    def test_unknown_prefix(self):
         with self.assertRaises(S.SessionError):
             S.pick(self.sessions, "zzzz")
 
-    def test_prefijo_ambiguo(self):
+    def test_ambiguous_prefix(self):
         write_session(self.root, "-home-u-proj", "aaaaaaaa-0000-0000-0000-0000000000ff",
                       [user("otra más", at=ts(50))])
         with self.assertRaises(S.SessionError):
@@ -272,7 +272,7 @@ class TestPick(TempRoot):
 
 
 class TestPublicRecords(TempRoot):
-    def test_saca_las_claves_internas_sin_tocar_el_original(self):
+    def test_drops_internal_keys_without_touching_the_original(self):
         simple_tree(self.root)
         sessions = self.load()
         pub = S.public_records(sessions)
@@ -283,22 +283,22 @@ class TestPublicRecords(TempRoot):
 
 
 class TestParseTs(unittest.TestCase):
-    def test_acepta_z_y_offset(self):
+    def test_accepts_z_and_offset(self):
         self.assertIsNotNone(S.parse_ts("2025-08-14T10:00:00.000Z"))
         self.assertIsNotNone(S.parse_ts("2025-08-14T10:00:00+02:00"))
 
-    def test_devuelve_none_si_no_se_puede_leer(self):
+    def test_returns_none_if_unreadable(self):
         self.assertIsNone(S.parse_ts(None))
         self.assertIsNone(S.parse_ts(""))
         self.assertIsNone(S.parse_ts("ayer a la tarde"))
 
 
 class TestRoots(unittest.TestCase):
-    def test_claude_config_dir_manda(self):
+    def test_claude_config_dir_wins(self):
         with unittest.mock.patch.dict(os.environ, {"CLAUDE_CONFIG_DIR": "/x/cfg"}):
             self.assertEqual(S.default_root(), os.path.join("/x/cfg", "projects"))
 
-    def test_sin_variable_cae_al_home(self):
+    def test_no_variable_falls_back_to_home(self):
         with unittest.mock.patch.dict(os.environ, {}, clear=True):
             self.assertTrue(S.default_root().endswith(os.path.join(".claude", "projects")))
 

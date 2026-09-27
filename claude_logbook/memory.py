@@ -1,32 +1,32 @@
-"""Memorias de proyecto: los .md que Claude Code deja en <proyecto>/memory/.
+"""Project memories: the .md files Claude Code leaves in <project>/memory/.
 
-Cada proyecto puede acumular recuerdos en
+Each project can accumulate memories in
 
-    ~/.claude/projects/<proyecto>/memory/<nombre>.md
+    ~/.claude/projects/<project>/memory/<name>.md
 
-Un archivo por recuerdo, con frontmatter YAML (`name`, `description`,
-`metadata.type`, `metadata.originSessionId`) y cuerpo markdown. Al lado vive
-`MEMORY.md`, el índice: una línea por memoria, y es lo único que se carga en
-contexto al arrancar una sesión. Una memoria que no figura ahí sigue en disco
-pero deja de recordarse, así que la diferencia entre ambos vale la pena mirarla.
+One file per memory, with YAML frontmatter (`name`, `description`,
+`metadata.type`, `metadata.originSessionId`) and a markdown body. Next to them
+lives `MEMORY.md`, the index: one line per memory, and the only thing loaded
+into context when a session starts. A memory missing from it is still on disk
+but is no longer remembered, so the difference between both is worth checking.
 
-Esquema del registro que devuelve `read_memory`, con las mismas claves cortas
-que `sessions` porque también viaja embebido en el HTML:
+Schema of the record returned by `read_memory`, with the same short keys as
+`sessions` because it also travels embedded in the HTML:
 
-    name  nombre del frontmatter (o el del archivo si falta)
-    file  nombre del archivo, con extensión
-    p     cwd del proyecto
-    desc  descripción del frontmatter
-    ty    tipo declarado: project | user | feedback | reference
-    src   uuid de la sesión que la creó, si lo declara
-    body  cuerpo markdown, sin el frontmatter
-    ln    enlaces [[...]] que aparecen en el cuerpo
-    k     tamaño en KB
-    l     mtime del archivo (ISO 8601)
-    ix    True si figura en MEMORY.md
-    hix   True si el proyecto tiene MEMORY.md
+    name  frontmatter name (or the file name if missing)
+    file  file name, with extension
+    p     project cwd
+    desc  frontmatter description
+    ty    declared type: project | user | feedback | reference
+    src   uuid of the session that created it, if declared
+    body  markdown body, without the frontmatter
+    ln    [[...]] links that appear in the body
+    k     size in KB
+    l     file mtime (ISO 8601)
+    ix    True if listed in MEMORY.md
+    hix   True if the project has a MEMORY.md
 
-`project_dir` es interno y `public_records()` lo saca antes de serializar.
+`project_dir` is internal and `public_records()` drops it before serializing.
 """
 
 import glob
@@ -44,7 +44,7 @@ TYPES = ("project", "user", "feedback", "reference")
 
 FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n?", re.S)
 LINK_RE = re.compile(r"\[\[([^\]\n]+)\]\]")
-# En el índice cada línea es "- [Título](archivo.md) — pista".
+# In the index each line is "- [Title](file.md) — hint".
 INDEX_LINK_RE = re.compile(r"\(([^)\n]+)\.md\)")
 
 
@@ -60,17 +60,17 @@ def index_path(project_dir, root=None):
     return os.path.join(memory_dir(project_dir, root), INDEX_NAME)
 
 
-# ──────────────────────────────── parseo ────────────────────────────────
+# ──────────────────────────────── parsing ───────────────────────────────
 
 def _field(front, key):
-    """Valor de una clave del frontmatter. Plano: alcanza para lo que escribe
-    Claude Code, que anida `type` y `originSessionId` pero sin repetirlas."""
+    """Value of a frontmatter key. Flat: enough for what Claude Code writes,
+    which nests `type` and `originSessionId` but without repeating them."""
     hit = re.search(r"^\s*%s:\s*(.+?)\s*$" % re.escape(key), front, re.M)
     if not hit:
         return None
     value = hit.group(1).strip()
-    # YAML de una línea: si viene entrecomillado, las comillas internas están
-    # escapadas y hay que devolverlas como estaban.
+    # One-line YAML: if it comes quoted, the inner quotes are
+    # escaped and have to be restored as they were.
     for quote in ('"', "'"):
         if len(value) >= 2 and value[0] == quote and value[-1] == quote:
             value = value[1:-1]
@@ -104,7 +104,7 @@ def read_memory(path, project_dir):
 
 
 def read_index(project_dir, root=None):
-    """Nombres (sin .md) que el MEMORY.md del proyecto enlaza."""
+    """Names (without .md) that the project's MEMORY.md links to."""
     try:
         with open(index_path(project_dir, root), "r",
                   encoding="utf-8", errors="ignore") as f:
@@ -113,13 +113,13 @@ def read_index(project_dir, root=None):
         return set()
 
 
-# ──────────────────────────────── carga ────────────────────────────────
+# ──────────────────────────────── loading ──────────────────────────────
 
 def load_memories(sessions, root=None):
-    """Lee las memorias de todos los proyectos.
+    """Reads the memories of every project.
 
-    La ruta real del proyecto sale de las sesiones: el nombre del directorio
-    codifica "/" y "." los dos como "-" y no se puede invertir.
+    The real project path comes from the sessions: the directory name encodes
+    "/" and "." both as "-" and cannot be reversed.
     """
     root = root or default_root()
     cwd_by_dir = {}
@@ -132,7 +132,7 @@ def load_memories(sessions, root=None):
         files = sorted(f for f in glob.glob(os.path.join(d, "*.md"))
                        if os.path.basename(f) != INDEX_NAME)
         if not files:
-            continue  # un memory/ vacío no es un proyecto con memoria
+            continue  # an empty memory/ is not a project with memory
 
         has_index = os.path.exists(os.path.join(d, INDEX_NAME))
         listed = read_index(project_dir, root) if has_index else set()
@@ -152,7 +152,7 @@ def load_memories(sessions, root=None):
 
 
 def public_records(memories):
-    """Copia sin las claves internas, lista para serializar."""
+    """Copy without the internal keys, ready to serialize."""
     out = []
     for m in memories:
         clean = dict(m)
@@ -162,7 +162,7 @@ def public_records(memories):
     return out
 
 
-# ──────────────────────────────── filtros ────────────────────────────────
+# ──────────────────────────────── filters ────────────────────────────────
 
 def apply_filters(memories, project=None, query=None, kind=None):
     out = memories
@@ -186,7 +186,7 @@ def apply_filters(memories, project=None, query=None, kind=None):
 
 
 def pick(memories, ref):
-    """Resuelve un índice de la tabla (1-based) o un prefijo del nombre."""
+    """Resolves a table index (1-based) or a name prefix."""
     if ref.isdigit():
         i = int(ref)
         if 1 <= i <= len(memories):
@@ -202,16 +202,16 @@ def pick(memories, ref):
         return hits[0]
     if not hits:
         raise SessionError(f"ninguna memoria coincide con '{ref}'")
-    nombres = ", ".join(m["name"] for m in hits[:4])
+    name_list = ", ".join(m["name"] for m in hits[:4])
     raise SessionError(
-        f"'{ref}' es ambiguo, coincide con {len(hits)}: {nombres}"
+        f"'{ref}' es ambiguo, coincide con {len(hits)}: {name_list}"
         + (", …" if len(hits) > 4 else ""))
 
 
-# ──────────────────────────────── auditoría ────────────────────────────────
+# ──────────────────────────────── audit ────────────────────────────────────
 
 def audit(memories, sessions, root=None):
-    """Inconsistencias entre archivos, índices, enlaces y sesiones de origen."""
+    """Inconsistencies between files, indexes, links and origin sessions."""
     known = {m["name"] for m in memories} | {m["file"][:-3] for m in memories}
     session_ids = {s["id"] for s in sessions}
 
@@ -238,13 +238,13 @@ def audit_total(report):
     return sum(len(v) for v in report.values())
 
 
-# ──────────────────────────────── borrado ────────────────────────────────
+# ──────────────────────────────── deletion ───────────────────────────────
 
 def unindex(m, root=None):
-    """Saca del MEMORY.md la línea que apunta a esta memoria.
+    """Removes the line pointing to this memory from MEMORY.md.
 
-    Devuelve True si el índice cambió. No es un error que no cambie: la memoria
-    podía no estar listada.
+    Returns True if the index changed. It is not an error if it does not: the
+    memory may not have been listed.
     """
     path = index_path(m["project_dir"], root)
     try:
@@ -267,6 +267,6 @@ def unindex(m, root=None):
 
 
 def delete(m, root=None):
-    """Borra el archivo y lo saca del índice. Devuelve si se desindexó."""
+    """Deletes the file and removes it from the index. Returns whether it was unindexed."""
     os.remove(memory_path(m, root))
     return unindex(m, root)

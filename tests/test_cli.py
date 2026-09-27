@@ -18,7 +18,7 @@ PAYLOAD_RE = re.compile(
 
 
 class CliCase(unittest.TestCase):
-    """Cada test corre contra un ~/.claude y un caché de mentira."""
+    """Each test runs against a fake ~/.claude and cache."""
 
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
@@ -42,43 +42,43 @@ class CliCase(unittest.TestCase):
 
 
 class TestTabla(CliCase):
-    def test_lista_las_sesiones(self):
+    def test_lists_the_sessions(self):
         simple_tree(self.root)
         code, out, _ = self.run_cli()
         self.assertEqual(code, 0)
         self.assertIn("Arreglar el build", out)
         self.assertIn("3 sesiones · 2 proyectos", out)
 
-    def test_filtra_por_texto(self):
+    def test_filters_by_text(self):
         simple_tree(self.root)
         code, out, _ = self.run_cli("arreglar")
         self.assertEqual(code, 0)
         self.assertIn("1 de 3 sesiones", out)
 
-    def test_limita_la_cantidad(self):
+    def test_limits_the_count(self):
         simple_tree(self.root)
         _, out, _ = self.run_cli("-n", "1")
         self.assertIn("1 de 3 sesiones", out)
 
-    def test_un_filtro_sin_resultados_sale_con_1(self):
+    def test_filter_without_results_exits_with_1(self):
         simple_tree(self.root)
         code, _, err = self.run_cli("no-existe-esto")
         self.assertEqual(code, 1)
         self.assertIn("Ninguna sesión coincide", err)
 
-    def test_sin_directorio_de_claude_sale_con_2(self):
+    def test_no_claude_directory_exits_with_2(self):
         with unittest.mock.patch.dict(os.environ, {"CLAUDE_CONFIG_DIR": "/no/existe"}):
             code, _, err = self.run_cli()
         self.assertEqual(code, 2)
         self.assertIn("no existe", err)
 
-    def test_sin_ninguna_sesion_sale_con_1(self):
+    def test_no_session_exits_with_1(self):
         code, _, err = self.run_cli()
         self.assertEqual(code, 1)
         self.assertIn("No hay ninguna sesión", err)
 
 
-class TestExportar(CliCase):
+class TestExport(CliCase):
     def test_json(self):
         simple_tree(self.root)
         code, out, _ = self.run_cli("--json")
@@ -100,37 +100,37 @@ class TestExportar(CliCase):
         self.assertEqual(len(payload["s"]), 3)
         self.assertEqual(payload["m"], [])
 
-    def test_html_no_toca_stdout(self):
-        # El resumen va a stderr para que `--html /dev/stdout` siga sirviendo.
+    def test_html_leaves_stdout_alone(self):
+        # The summary goes to stderr so `--html /dev/stdout` keeps working.
         simple_tree(self.root)
         _, out, _ = self.run_cli("--html", os.path.join(self.home, "s.html"))
         self.assertEqual(out, "")
 
 
-class TestLectura(CliCase):
-    def test_show_por_indice(self):
+class TestReading(CliCase):
+    def test_show_by_index(self):
         simple_tree(self.root)
         code, out, _ = self.run_cli("-s", "1", "--no-pager")
         self.assertEqual(code, 0)
         self.assertIn("¿por qué falla el build?", out)
 
-    def test_show_por_prefijo_de_uuid(self):
+    def test_show_by_uuid_prefix(self):
         simple_tree(self.root)
         _, out, _ = self.run_cli("-s", "cccccccc", "--no-pager")
         self.assertIn("hola", out)
 
-    def test_show_respeta_el_filtro_previo(self):
+    def test_show_honours_the_previous_filter(self):
         simple_tree(self.root)
         _, out, _ = self.run_cli("-p", "/home/u/otro", "-s", "1", "--no-pager")
         self.assertIn("hola", out)
 
-    def test_una_referencia_que_no_existe_sale_con_2(self):
+    def test_missing_reference_exits_with_2(self):
         simple_tree(self.root)
         code, _, err = self.run_cli("-s", "99")
         self.assertEqual(code, 2)
         self.assertIn("fuera de rango", err)
 
-    def test_resume_imprime_el_comando(self):
+    def test_resume_prints_the_command(self):
         simple_tree(self.root)
         code, out, _ = self.run_cli("-r", "1")
         self.assertEqual(code, 0)
@@ -139,11 +139,11 @@ class TestLectura(CliCase):
                          "aaaaaaaa-0000-0000-0000-000000000001")
 
 
-class TestBorrado(CliCase):
+class TestDeletion(CliCase):
     def paths(self):
         return sorted(os.listdir(os.path.join(self.root, "-home-u-proj")))
 
-    def test_dry_run_no_toca_nada(self):
+    def test_dry_run_touches_nothing(self):
         simple_tree(self.root)
         antes = self.paths()
         code, out, _ = self.run_cli("--delete-empty", "--dry-run")
@@ -151,7 +151,7 @@ class TestBorrado(CliCase):
         self.assertIn("no se tocó nada", out)
         self.assertEqual(self.paths(), antes)
 
-    def test_borra_las_vacias(self):
+    def test_deletes_the_empty_ones(self):
         simple_tree(self.root)
         code, out, _ = self.run_cli("--delete-empty", "-y")
         self.assertEqual(code, 0)
@@ -159,28 +159,28 @@ class TestBorrado(CliCase):
         self.assertEqual(self.paths(),
                          ["aaaaaaaa-0000-0000-0000-000000000001.jsonl"])
 
-    def test_borra_una_puntual_por_prefijo(self):
+    def test_deletes_a_single_one_by_prefix(self):
         simple_tree(self.root)
         code, _, _ = self.run_cli("-D", "aaaaaaaa", "-y")
         self.assertEqual(code, 0)
         self.assertEqual(self.paths(),
                          ["bbbbbbbb-0000-0000-0000-000000000002.jsonl"])
 
-    def test_no_repite_si_la_pediste_dos_veces(self):
+    def test_no_repeat_if_requested_twice(self):
         simple_tree(self.root)
         code, out, _ = self.run_cli("-D", "aaaaaaaa", "1", "-y")
         self.assertEqual(code, 0)
         self.assertIn("1 sesión borrada", out)
 
-    def test_la_borrada_no_vuelve_desde_el_cache(self):
+    def test_deleted_one_does_not_come_back_from_cache(self):
         simple_tree(self.root)
-        self.run_cli()                       # llena el caché
+        self.run_cli()                       # fills the cache
         self.run_cli("--delete-empty", "-y")
         _, out, _ = self.run_cli()
         self.assertIn("2 sesiones", out)
         self.assertNotIn("bbbbbbbb", out)
 
-    def test_el_filtro_acota_lo_que_se_borra(self):
+    def test_filter_limits_what_is_deleted(self):
         write_session(self.root, "-home-u-otro", "ffffffff-0000-0000-0000-000000000006",
                       [{"type": "system", "timestamp": ts(0)}])
         simple_tree(self.root)
@@ -190,7 +190,7 @@ class TestBorrado(CliCase):
         self.assertTrue(os.path.exists(os.path.join(
             self.root, "-home-u-otro", "ffffffff-0000-0000-0000-000000000006.jsonl")))
 
-    def test_sin_nada_para_borrar_avisa(self):
+    def test_nothing_to_delete_warns(self):
         write_session(self.root, "-p", "aaaaaaaa-0000-0000-0000-000000000001",
                       [user("hola", at=ts(0))])
         code, _, err = self.run_cli("--delete-empty", "-y")
@@ -199,7 +199,7 @@ class TestBorrado(CliCase):
 
 
 class TestParser(unittest.TestCase):
-    def test_html_sin_valor_usa_el_nombre_por_defecto(self):
+    def test_html_without_value_uses_the_default_name(self):
         args = cli.build_parser().parse_args(["--html"])
         self.assertEqual(args.html, cli.DEFAULT_HTML)
 
@@ -207,12 +207,12 @@ class TestParser(unittest.TestCase):
         self.assertEqual(cli.build_parser().parse_args(["--html", "x.html"]).html,
                          "x.html")
 
-    def test_la_query_junta_las_palabras(self):
+    def test_query_joins_the_words(self):
         args = cli.build_parser().parse_args(["dos", "palabras"])
         self.assertEqual(args.query, ["dos", "palabras"])
 
 
-class TestMemoria(CliCase):
+class TestMemory(CliCase):
     def test_tabla(self):
         simple_tree(self.root)
         memory_tree(self.root)
@@ -221,13 +221,13 @@ class TestMemoria(CliCase):
         self.assertIn("deploy-docker", out)
         self.assertIn("4 memorias", out)
 
-    def test_sin_memorias_avisa(self):
+    def test_no_memories_warns(self):
         simple_tree(self.root)
         code, _, err = self.run_cli("-m")
         self.assertEqual(code, 1)
         self.assertIn("memorias", err)
 
-    def test_filtra_por_tipo(self):
+    def test_filters_by_type(self):
         simple_tree(self.root)
         memory_tree(self.root)
         code, out, _ = self.run_cli("-m", "--type", "reference")
@@ -235,7 +235,7 @@ class TestMemoria(CliCase):
         self.assertIn("roles-db", out)
         self.assertNotIn("deploy-docker", out)
 
-    def test_la_query_busca_en_el_cuerpo(self):
+    def test_query_searches_the_body(self):
         simple_tree(self.root)
         memory_tree(self.root)
         code, out, _ = self.run_cli("-m", "make up")
@@ -243,7 +243,7 @@ class TestMemoria(CliCase):
         self.assertIn("deploy-docker", out)
         self.assertNotIn("roles-db", out)
 
-    def test_show_por_nombre(self):
+    def test_show_by_name(self):
         simple_tree(self.root)
         memory_tree(self.root)
         code, out, _ = self.run_cli("-m", "-s", "deploy", "--no-pager")
@@ -251,21 +251,21 @@ class TestMemoria(CliCase):
         self.assertIn("Se despliega con", out)
         self.assertIn("deploy-docker", out)
 
-    def test_show_avisa_si_no_esta_indexada(self):
+    def test_show_warns_if_not_indexed(self):
         simple_tree(self.root)
         memory_tree(self.root)
         _, out, _ = self.run_cli("-m", "-s", "suelta", "--no-pager")
         self.assertIn("MEMORY.md", out)
 
-    def test_check_lista_los_problemas(self):
+    def test_check_lists_the_problems(self):
         simple_tree(self.root)
         memory_tree(self.root)
         code, out, _ = self.run_cli("-m", "--check")
-        self.assertEqual(code, 1)  # hay cosas para mirar
+        self.assertEqual(code, 1)  # there are things to look at
         self.assertIn("sin MEMORY.md", out)
         self.assertIn("no-existe", out)
 
-    def test_check_limpio_sale_cero(self):
+    def test_clean_check_exits_zero(self):
         simple_tree(self.root)
         write_memory(self.root, "-home-u-proj", "sola", body="sin enlaces")
         from .fixtures import write_index
@@ -274,7 +274,7 @@ class TestMemoria(CliCase):
         self.assertEqual(code, 0)
         self.assertIn("Todo en orden", out)
 
-    def test_borrado_en_seco_no_toca_nada(self):
+    def test_dry_run_deletion_touches_nothing(self):
         simple_tree(self.root)
         memory_tree(self.root)
         path = os.path.join(self.root, "-home-u-proj", "memory",
@@ -284,7 +284,7 @@ class TestMemoria(CliCase):
         self.assertIn("no se tocó nada", out)
         self.assertTrue(os.path.exists(path))
 
-    def test_borra_y_desindexa(self):
+    def test_deletes_and_unindexes(self):
         simple_tree(self.root)
         memory_tree(self.root)
         path = os.path.join(self.root, "-home-u-proj", "memory",
@@ -299,7 +299,7 @@ class TestMemoria(CliCase):
         self.assertIn("roles-db.md", index)
         self.assertIn("sacadas del índice", out)
 
-    def test_borrado_sin_confirmar_cancela(self):
+    def test_unconfirmed_deletion_cancels(self):
         simple_tree(self.root)
         memory_tree(self.root)
         path = os.path.join(self.root, "-home-u-proj", "memory",
@@ -310,14 +310,14 @@ class TestMemoria(CliCase):
         self.assertIn("Cancelado", err)
         self.assertTrue(os.path.exists(path))
 
-    def test_referencia_inexistente(self):
+    def test_missing_reference(self):
         simple_tree(self.root)
         memory_tree(self.root)
         code, _, err = self.run_cli("-m", "-s", "no-existe-nada")
         self.assertEqual(code, 2)
         self.assertIn("ninguna memoria", err)
 
-    def test_html_embebe_las_memorias(self):
+    def test_html_embeds_the_memories(self):
         simple_tree(self.root)
         memory_tree(self.root)
         out_path = os.path.join(self.home, "s.html")

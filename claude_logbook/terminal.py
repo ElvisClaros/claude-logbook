@@ -1,4 +1,4 @@
-"""Salida para la terminal: colores, tabla y lectura de una conversación."""
+"""Terminal output: colors, table and reading a conversation."""
 
 import os
 import re
@@ -14,19 +14,19 @@ MES = ["ene", "feb", "mar", "abr", "may", "jun",
 
 ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 
-# Anchos mínimos de terminal para mostrar cada columna opcional.
+# Minimum terminal widths to show each optional column.
 MIN_COLS_PATH = 92
 MIN_COLS_DUR = 74
 
 
 class Style:
-    """Códigos ANSI, o cadenas vacías si la salida no es una terminal."""
+    """ANSI codes, or empty strings if the output is not a terminal."""
 
     CODES = {
         "reset": "0", "bold": "1", "dim": "2", "italic": "3",
         "amber": "38;5;179", "copper": "38;5;173", "grey": "38;5;245",
         "faint": "38;5;240", "ink": "38;5;252", "blue": "38;5;110",
-        # barra de antigüedad, del ámbar vivo al gris
+        # age bar, from bright amber to grey
         "age0": "38;5;214", "age1": "38;5;179",
         "age2": "38;5;137", "age3": "38;5;239",
     }
@@ -43,20 +43,20 @@ class Style:
 
     @classmethod
     def from_stream(cls, stream, no_color=False):
-        """Color solo si hay terminal, no lo desactivaron y no hay NO_COLOR."""
+        """Color only with a terminal, when not disabled and without NO_COLOR."""
         return cls(bool(getattr(stream, "isatty", lambda: False)())
                    and not no_color
                    and not os.environ.get("NO_COLOR"))
 
 
-# ──────────────────────────────── formato ────────────────────────────────
+# ──────────────────────────────── formatting ─────────────────────────────
 
 def visible_len(s):
     return len(ANSI_RE.sub("", s))
 
 
 def clip(s, width):
-    """Recorta a `width` columnas, con … si no entra."""
+    """Truncates to `width` columns, with … if it does not fit."""
     s = s.replace("\n", " ")
     if len(s) <= width:
         return s
@@ -105,7 +105,7 @@ def fmt_size(kb):
 
 
 def stripe(iso, now, st):
-    """Barra de antigüedad a la izquierda de cada fila."""
+    """Age bar to the left of each row."""
     if not st.on:
         return "|"
     n = (now - parse_ts(iso)).total_seconds() / 86400
@@ -120,7 +120,7 @@ def print_table(sessions, st, now, out, width=None):
     show_path = width >= MIN_COLS_PATH
     show_dur = width >= MIN_COLS_DUR
 
-    # columnas fijas: idx(3) barra(1) fecha(6) rel(9) msgs(4) dur(6) id(8) + gaps
+    # fixed columns: idx(3) bar(1) date(6) rel(9) msgs(4) dur(6) id(8) + gaps
     fixed = 3 + 1 + 6 + 9 + 4 + (6 if show_dur else 0) + 8
     gaps = 7 if show_dur else 6
     flex = max(24, width - fixed - gaps)
@@ -167,16 +167,16 @@ def print_table(sessions, st, now, out, width=None):
         print(" ".join(cells), file=out)
 
 
-# ──────────────────────────── una conversación ────────────────────────────
+# ──────────────────────────── one conversation ────────────────────────────
 
 def strip_md(text):
-    """Markdown mínimo para la terminal: saca ** y marcadores de título."""
+    """Minimal markdown for the terminal: removes ** and heading markers."""
     text = re.sub(r"^#{1,6}\s+", "", text, flags=re.M)
     return re.sub(r"\*\*([^*\n]+)\*\*", r"\1", text)
 
 
 def render_block(text, st, width, code_color):
-    """Formatea un mensaje respetando las cercas de código."""
+    """Formats a message honouring code fences."""
     lines = []
     in_code = False
     for raw in text.split("\n"):
@@ -219,8 +219,8 @@ def print_chat(s, st, out, show_tools=True, width=None):
                 first = False
             continue
 
-        # La separación va antes de cada turno: así una tanda de herramientas
-        # queda pegada al mensaje que la lanzó y separada del siguiente.
+        # The separator goes before each turn: that way a batch of tool calls
+        # stays attached to the message that launched it and apart from the next one.
         if not first:
             print(file=out)
         first = False
@@ -233,12 +233,12 @@ def print_chat(s, st, out, show_tools=True, width=None):
 
 
 def resume_cmd(s):
-    """El --resume solo encuentra la sesión desde su directorio original."""
+    """--resume only finds the session from its original directory."""
     return f"cd {s['p']} && claude --resume {s['id']}"
 
 
 def pager(text):
-    """Manda el texto a $PAGER si hay terminal; si no, a stdout."""
+    """Sends the text to $PAGER with a terminal; otherwise to stdout."""
     if not sys.stdout.isatty():
         sys.stdout.write(text)
         return
@@ -251,9 +251,9 @@ def pager(text):
         sys.stdout.write(text)
 
 
-# ──────────────────────────────── memorias ────────────────────────────────
+# ──────────────────────────────── memories ────────────────────────────────
 
-# Anchos mínimos para las columnas opcionales de la tabla de memorias.
+# Minimum widths for the optional columns of the memories table.
 MIN_COLS_MEM_PROJECT = 78
 MIN_COLS_MEM_DESC = 104
 
@@ -266,7 +266,7 @@ def print_memories(memories, st, now, out, width=None):
     show_project = width >= MIN_COLS_MEM_PROJECT
     show_desc = width >= MIN_COLS_MEM_DESC
 
-    # columnas fijas: idx(3) tipo(9) fecha(6) cuándo(9) + separadores
+    # fixed columns: idx(3) type(9) date(6) when(9) + separators
     fixed = 3 + 9 + 6 + 9
     gaps = 4 + (1 if show_project else 0) + (1 if show_desc else 0)
     flex = max(18, width - fixed - gaps)
@@ -288,7 +288,7 @@ def print_memories(memories, st, now, out, width=None):
     print(" ".join(head), file=out)
 
     for i, m in enumerate(memories, 1):
-        # El asterisco marca lo que no está en MEMORY.md: existe pero no se carga.
+        # The asterisk marks what is not in MEMORY.md: it exists but is not loaded.
         tag = "" if m["ix"] else f" {st.copper}*{st.reset}"
         avail = w_name - visible_len(tag)
         cells = [
@@ -321,9 +321,9 @@ def print_memory(m, st, out, path=None, width=None):
         print(f"{st.faint}{path}{st.reset}", file=out)
 
     if not m["ix"]:
-        aviso = ("este proyecto no tiene MEMORY.md" if not m["hix"]
+        warning = ("este proyecto no tiene MEMORY.md" if not m["hix"]
                  else "no figura en MEMORY.md, así que no se carga en contexto")
-        print(f"{st.copper}* {aviso}{st.reset}", file=out)
+        print(f"{st.copper}* {warning}{st.reset}", file=out)
 
     print(f"{st.faint}{'─' * min(width, 80)}{st.reset}\n", file=out)
 
@@ -338,8 +338,8 @@ def print_memory(m, st, out, path=None, width=None):
 
 
 def print_audit(report, st, out):
-    """Informe de inconsistencias. Devuelve cuántas se listaron."""
-    bloques = (
+    """Inconsistency report. Returns how many were listed."""
+    blocks = (
         ("sin_indice", "Proyectos con memorias pero sin MEMORY.md",
          "sin índice no se carga ninguna de sus memorias",
          lambda m: f"{clip(m['name'], 38):<38} {st.grey}{m['p']}{st.reset}"),
@@ -358,13 +358,13 @@ def print_audit(report, st, out):
     )
 
     total = 0
-    for key, titulo, nota, fmt in bloques:
+    for key, title_text, note, fmt in blocks:
         items = report.get(key) or []
         if not items:
             continue
         total += len(items)
-        print(f"{st.copper}{titulo} ({len(items)}){st.reset}", file=out)
-        print(f"{st.faint}  {nota}{st.reset}", file=out)
+        print(f"{st.copper}{title_text} ({len(items)}){st.reset}", file=out)
+        print(f"{st.faint}  {note}{st.reset}", file=out)
         for item in items:
             print(f"  {fmt(item)}", file=out)
         print(file=out)

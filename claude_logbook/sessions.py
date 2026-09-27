@@ -1,28 +1,28 @@
-"""Parseo de los .jsonl que Claude Code deja en ~/.claude/projects/.
+"""Parsing of the .jsonl files Claude Code leaves in ~/.claude/projects/.
 
-Cada conversación es un archivo JSON Lines: una línea por evento. De ahí sale un
-registro por sesión con claves de una letra, porque ese mismo registro viaja
-embebido dentro del HTML y los nombres largos se pagan una vez por sesión.
+Each conversation is a JSON Lines file: one line per event. From it comes one
+record per session with one-letter keys, because that same record travels
+embedded inside the HTML and long names are paid once per session.
 
-Esquema del registro que devuelve `read_session`:
+Schema of the record returned by `read_session`:
 
-    id   uuid de la sesión (el nombre del archivo)
-    p    cwd del proyecto
-    b    rama de git
-    t    título
-    ai   True si el título lo generó Claude, False si es el primer mensaje
-    n    True si parece un `claude -p` no interactivo
-    e    True si la sesión no tiene ningún mensaje
-    i    True si `p` se dedujo de otra sesión del mismo proyecto
-    f/l  timestamp del primer y del último evento (ISO 8601)
-    d    duración en minutos
-    u/a  cantidad de mensajes tuyos / de Claude
-    k    tamaño del .jsonl en KB
-    v    versión de Claude Code
-    c    transcripción: [{"r": "u" | "a" | "t", "x": texto}]
+    id   session uuid (the file name)
+    p    project cwd
+    b    git branch
+    t    title
+    ai   True if Claude generated the title, False if it is the first message
+    n    True if it looks like a non-interactive `claude -p`
+    e    True if the session has no message at all
+    i    True if `p` was inferred from another session of the same project
+    f/l  timestamp of the first and last event (ISO 8601)
+    d    duration in minutes
+    u/a  number of messages from you / from Claude
+    k    size of the .jsonl in KB
+    v    Claude Code version
+    c    transcript: [{"r": "u" | "a" | "t", "x": text}]
 
-`project_dir` y `mtime` son internos y no salen del módulo: `public_records()`
-los saca antes de que el registro se serialice.
+`project_dir` and `mtime` are internal and never leave the module:
+`public_records()` drops them before the record is serialized.
 """
 
 import glob
@@ -31,8 +31,8 @@ import os
 import re
 from datetime import datetime, timezone
 
-# Sube si cambia el esquema del registro: invalida los cachés viejos en vez de
-# leer registros con la forma anterior.
+# Bump it when the record schema changes: it invalidates old caches instead of
+# reading records with the previous shape.
 CACHE_VERSION = 2
 
 EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
@@ -41,13 +41,13 @@ INTERNAL_KEYS = ("project_dir", "mtime")
 
 
 class SessionError(Exception):
-    """Error de uso que la CLI convierte en un mensaje y un código de salida."""
+    """Usage error that the CLI turns into a message and an exit code."""
 
 
-# ──────────────────────────────── ubicaciones ────────────────────────────────
+# ──────────────────────────────── locations ──────────────────────────────────
 
 def default_root():
-    """~/.claude/projects, o el equivalente si CLAUDE_CONFIG_DIR está seteada."""
+    """~/.claude/projects, or its equivalent if CLAUDE_CONFIG_DIR is set."""
     base = os.environ.get("CLAUDE_CONFIG_DIR") or os.path.join(
         os.path.expanduser("~"), ".claude")
     return os.path.join(base, "projects")
@@ -59,19 +59,19 @@ def default_cache_path():
 
 
 def session_path(s, root=None):
-    """Ruta del .jsonl. El nombre del archivo es el UUID y el del directorio
-    padre es lo que guardamos en project_dir, así que es reconstruible."""
+    """Path of the .jsonl. The file name is the UUID and the parent directory
+    name is what we keep in project_dir, so it can be rebuilt."""
     return os.path.join(root or default_root(),
                         s["project_dir"], s["id"] + ".jsonl")
 
 
-# ─────────────────────────── parseo de los .jsonl ───────────────────────────
+# ─────────────────────────── parsing the .jsonl files ───────────────────────
 
 TAG_RE = re.compile(r"<[^>]+>")
 REMINDER_RE = re.compile(r"<system-reminder>.*?</system-reminder>", re.S)
 
-# Un mensaje que empieza con alguno de estos no es texto del usuario: es un
-# bloque que genera la propia CLI al ejecutar un comando local.
+# A message starting with any of these is not user text: it is a
+# block the CLI itself generates when running a local command.
 SKIP_PREFIXES = (
     "<local-command-caveat", "<command-name", "<command-message",
     "<command-args", "<local-command-stdout", "<system-reminder",
@@ -80,11 +80,11 @@ SKIP_PREFIXES = (
 TITLE_MAX = 160
 TOOL_ARG_MAX = 140
 
-# Umbral del heurístico de `claude -p`: un único mensaje más largo que esto, sin
-# ninguna ida y vuelta, es un pipe por stdin y no una conversación.
+# Threshold of the `claude -p` heuristic: a single message longer than this, with
+# no back and forth, is a pipe on stdin and not a conversation.
 NONINTERACTIVE_CHARS = 1500
 
-# Para cada herramienta, el parámetro que mejor resume qué hizo.
+# For each tool, the parameter that best summarizes what it did.
 TOOL_KEY = {
     "Bash": "command", "Read": "file_path", "Edit": "file_path",
     "Write": "file_path", "NotebookEdit": "notebook_path", "Glob": "pattern",
@@ -94,7 +94,7 @@ TOOL_KEY = {
 
 
 def clean_text(s):
-    """Devuelve texto de usuario legible, o None si es ruido del harness."""
+    """Returns readable user text, or None if it is harness noise."""
     if not isinstance(s, str):
         return None
     s = s.strip()
@@ -107,7 +107,7 @@ def clean_text(s):
 
 
 def tool_summary(block):
-    """Una línea del estilo 'Bash: git status' para una llamada a herramienta."""
+    """A line like 'Bash: git status' for a tool call."""
     name = block.get("name") or "tool"
     args = block.get("input") or {}
     if not isinstance(args, dict):
@@ -131,7 +131,7 @@ def blocks_of(message):
 
 
 def parse_ts(ts):
-    """ISO 8601 → datetime con zona, o None si no se puede leer."""
+    """ISO 8601 → timezone-aware datetime, or None if it cannot be read."""
     if not ts:
         return None
     try:
@@ -141,7 +141,7 @@ def parse_ts(ts):
 
 
 def read_session(path):
-    """Parsea un .jsonl entero y devuelve el registro de esa sesión."""
+    """Parses a whole .jsonl and returns that session's record."""
     session_id = os.path.basename(path)[:-6]  # sin .jsonl
     first_ts = last_ts = cwd = git_branch = version = None
     ai_title = fallback_title = None
@@ -156,7 +156,7 @@ def read_session(path):
             try:
                 obj = json.loads(line)
             except json.JSONDecodeError:
-                continue  # línea truncada por una sesión que sigue escribiendo
+                continue  # line truncated by a session that is still writing
             if not isinstance(obj, dict):
                 continue
 
@@ -164,7 +164,7 @@ def read_session(path):
 
             if kind == "ai-title":
                 if obj.get("aiTitle"):
-                    ai_title = obj["aiTitle"]  # nos quedamos con el más reciente
+                    ai_title = obj["aiTitle"]  # keep the most recent one
                 continue
 
             ts = obj.get("timestamp")
@@ -219,9 +219,9 @@ def read_session(path):
     st = os.stat(path)
     ft, lt = parse_ts(first_ts), parse_ts(last_ts)
 
-    # Un único mensaje enorme y ninguna ida y vuelta es la firma de un
-    # `claude -p` con algo piped por stdin (p. ej. un git diff para redactar el
-    # mensaje de commit), no de una conversación.
+    # A single huge message and no back and forth is the signature of a
+    # `claude -p` with something piped on stdin (e.g. a git diff to write the
+    # commit message), not of a conversation.
     noninteractive = (
         user_msgs == 1 and not ai_title and bool(convo)
         and len(convo[0]["x"]) > NONINTERACTIVE_CHARS
@@ -248,10 +248,10 @@ def read_session(path):
     }
 
 
-# ──────────────────────────────── caché ────────────────────────────────
+# ──────────────────────────────── cache ────────────────────────────────
 
 def _load_cache(path):
-    """Entradas del caché, o {} si no existe, está roto o quedó viejo."""
+    """Cache entries, or {} if it does not exist, is broken or is stale."""
     try:
         with open(path, encoding="utf-8") as f:
             blob = json.load(f)
@@ -264,21 +264,21 @@ def _load_cache(path):
 
 
 def _save_cache(path, entries):
-    """Escribe el caché de forma atómica. Si falla, no pasa nada."""
+    """Writes the cache atomically. If it fails, nothing happens."""
     try:
         os.makedirs(os.path.dirname(path), exist_ok=True)
-        # El pid en el temporal evita que dos corridas simultáneas se pisen.
+        # The pid in the temporary file keeps two simultaneous runs from clobbering each other.
         tmp = f"{path}.{os.getpid()}.tmp"
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump({"v": CACHE_VERSION, "entries": entries}, f,
                       ensure_ascii=False, separators=(",", ":"))
         os.replace(tmp, path)
     except OSError:
-        pass  # el caché es una optimización, no una condición de uso
+        pass  # the cache is an optimization, not a requirement
 
 
 def drop_from_cache(paths, cache_path=None):
-    """Saca del caché las sesiones borradas para que no reaparezcan."""
+    """Drops deleted sessions from the cache so they do not reappear."""
     cache_path = cache_path or default_cache_path()
     entries = _load_cache(cache_path)
     if not entries:
@@ -287,15 +287,15 @@ def drop_from_cache(paths, cache_path=None):
         _save_cache(cache_path, entries)
 
 
-# ──────────────────────────────── carga ────────────────────────────────
+# ──────────────────────────────── loading ──────────────────────────────
 
 def _fill_gaps(sessions):
-    """Completa lo que falta después de parsear todos los archivos.
+    """Fills in what is missing after parsing every file.
 
-    Algunas sesiones (un /resume cancelado) nunca registran cwd. El nombre del
-    directorio no se puede invertir de forma fiable porque "/" y "." se
-    codifican los dos como "-", así que tomamos la ruta prestada de otra sesión
-    del mismo proyecto y lo dejamos marcado en `i`.
+    Some sessions (a cancelled /resume) never record a cwd. The directory name
+    cannot be reliably reversed because "/" and "." are both encoded as "-", so
+    the path is borrowed from another session of the same project and flagged in
+    `i`.
     """
     known = {}
     for s in sessions:
@@ -313,7 +313,7 @@ def _fill_gaps(sessions):
 
 
 def load_sessions(root=None, cache_path=None, use_cache=True):
-    """Parsea todas las sesiones, reusando del caché las que no cambiaron."""
+    """Parses every session, reusing from the cache the ones that did not change."""
     root = root or default_root()
     cache_path = cache_path or default_cache_path()
     paths = sorted(glob.glob(os.path.join(root, "*", "*.jsonl")))
@@ -340,8 +340,8 @@ def load_sessions(root=None, cache_path=None, use_cache=True):
         fresh[path] = {"stamp": stamp, "rec": rec}
         sessions.append(rec)
 
-    # Antes de `_fill_gaps`, a propósito: al caché va el registro tal como salió
-    # del archivo, sin los campos deducidos a partir de las otras sesiones.
+    # Before `_fill_gaps`, on purpose: the cache gets the record as it came out
+    # of the file, without the fields inferred from the other sessions.
     if use_cache and (reparsed or len(fresh) != len(cache)):
         _save_cache(cache_path, fresh)
 
@@ -351,19 +351,19 @@ def load_sessions(root=None, cache_path=None, use_cache=True):
 
 
 def latest_activity(sessions):
-    """El instante más reciente de los datos: el "ahora" contra el que se
-    calculan las fechas relativas, para que no dependan del reloj de quien mira."""
+    """The most recent instant in the data: the "now" relative dates are computed
+    against, so they do not depend on the viewer's clock."""
     stamps = [parse_ts(s["l"]) for s in sessions]
     return max([t for t in stamps if t], default=EPOCH)
 
 
 def public_records(sessions):
-    """Copias sin las claves internas, listas para serializar."""
+    """Copies without the internal keys, ready to serialize."""
     return [{k: v for k, v in s.items() if k not in INTERNAL_KEYS}
             for s in sessions]
 
 
-# ──────────────────────────────── filtros ────────────────────────────────
+# ──────────────────────────────── filters ────────────────────────────────
 
 def apply_filters(sessions, project=None, grep=None, query=None,
                   hide_empty=False):
@@ -393,7 +393,7 @@ def apply_filters(sessions, project=None, grep=None, query=None,
 
 
 def pick(sessions, ref):
-    """Resuelve un índice de la tabla (1-based) o un prefijo de UUID."""
+    """Resolves a table index (1-based) or a UUID prefix."""
     if ref.isdigit():
         i = int(ref)
         if 1 <= i <= len(sessions):

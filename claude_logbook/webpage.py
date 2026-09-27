@@ -1,7 +1,7 @@
-"""Genera la página HTML autocontenida a partir de las sesiones.
+"""Builds the self-contained HTML page from the sessions.
 
-El resultado no necesita red ni servidor: los datos y las transcripciones van
-embebidos adentro y se abre con doble clic.
+The result needs neither network nor server: the data and the transcripts are
+embedded inside and it opens with a double click.
 """
 
 import json
@@ -13,7 +13,7 @@ TEMPLATE_NAME = "template.html"
 
 
 class TemplateError(Exception):
-    """El template no tiene la forma que espera el generador."""
+    """The template does not have the shape the generator expects."""
 
 
 def template_text(path=None):
@@ -24,31 +24,31 @@ def template_text(path=None):
 
 
 def build_payload(sessions, memories=None):
-    """Estructura que viaja embebida en la página.
+    """Structure that travels embedded in the page.
 
-    Un objeto y no una lista porque la página muestra dos cosas distintas:
-    sesiones y memorias de proyecto.
+    An object rather than a list because the page shows two different things:
+    sessions and project memories.
     """
     return {"s": list(sessions), "m": list(memories or ())}
 
 
 def encode_payload(payload):
-    """Serializa el payload para meterlo en un <script type=application/json>.
+    """Serializes the payload to put it inside a <script type=application/json>.
 
-    El parser de HTML corta ese bloque en el primer "</script", y las
-    transcripciones tienen HTML adentro. Escapamos "</" como "<\\/", que es un
-    escape válido de JSON: JSON.parse lo devuelve intacto.
+    The HTML parser cuts that block at the first "</script", and transcripts
+    contain HTML. "</" is escaped as "<\\/", which is a valid JSON escape:
+    JSON.parse returns it intact.
     """
     raw = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
     return raw.replace("</", "<\\/")
 
 
 def render(records, memories=None, template=None):
-    """Devuelve el HTML completo con los datos ya embebidos."""
+    """Returns the full HTML with the data already embedded."""
     html = template if template is not None else template_text()
-    # No se puede verificar el resultado buscando el marcador: estas mismas
-    # sesiones incluyen conversaciones sobre este script, así que el payload lo
-    # contiene como texto. Validamos el template antes de sustituir.
+    # The result cannot be checked by looking for the marker: these same
+    # sessions include conversations about this script, so the payload
+    # contains it as text. Validate the template before substituting.
     if html.count(MARKER) != 1:
         raise TemplateError(
             f"el template debe tener exactamente un {MARKER} "
@@ -57,7 +57,7 @@ def render(records, memories=None, template=None):
 
 
 def write(records, out_path, memories=None, template=None):
-    """Escribe la página y devuelve un resumen de lo que quedó adentro."""
+    """Writes the page and returns a summary of what went into it."""
     html = render(records, memories=memories, template=template)
     with open(out_path, "w", encoding="utf-8") as f:
         f.write(html)

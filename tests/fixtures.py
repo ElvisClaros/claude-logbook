@@ -1,4 +1,4 @@
-"""Sesiones .jsonl de mentira para los tests."""
+"""Fake .jsonl sessions for the tests."""
 
 import json
 import os
@@ -43,7 +43,7 @@ def ai_title(title, at=BASE_TS):
 
 
 def write_session(root, project_dir, session_id, events):
-    """Escribe un .jsonl y devuelve su ruta."""
+    """Writes a .jsonl and returns its path."""
     d = os.path.join(root, project_dir)
     os.makedirs(d, exist_ok=True)
     path = os.path.join(d, session_id + ".jsonl")
@@ -54,7 +54,7 @@ def write_session(root, project_dir, session_id, events):
 
 
 def simple_tree(root):
-    """Un árbol chico y variado: una charla, una vacía y una sin cwd."""
+    """A small, varied tree: a chat, an empty one and one without cwd."""
     write_session(root, "-home-u-proj", "aaaaaaaa-0000-0000-0000-000000000001", [
         ai_title("Arreglar el build"),
         user("¿por qué falla el build?", at=ts(0)),
@@ -70,16 +70,16 @@ def simple_tree(root):
     return root
 
 
-# ──────────────────────────────── memorias ────────────────────────────────
+# ──────────────────────────────── memories ────────────────────────────────
 
 def write_memory(root, project_dir, name, body="cuerpo", desc=None,
                  kind="project", origin=None, frontmatter=True):
-    """Escribe <proyecto>/memory/<name>.md y devuelve su ruta."""
+    """Writes <project>/memory/<name>.md and returns its path."""
     d = os.path.join(root, project_dir, "memory")
     os.makedirs(d, exist_ok=True)
     path = os.path.join(d, name + ".md")
 
-    partes = []
+    parts = []
     if frontmatter:
         campos = ["---", f"name: {name}"]
         if desc is not None:
@@ -88,16 +88,16 @@ def write_memory(root, project_dir, name, body="cuerpo", desc=None,
         if origin:
             campos.append(f"  originSessionId: {origin}")
         campos.append("---")
-        partes.append("\n".join(campos))
-    partes.append(body)
+        parts.append("\n".join(campos))
+    parts.append(body)
 
     with open(path, "w", encoding="utf-8") as f:
-        f.write("\n".join(partes) + "\n")
+        f.write("\n".join(parts) + "\n")
     return path
 
 
 def write_index(root, project_dir, names, extra=()):
-    """Escribe el MEMORY.md que enlaza esos nombres."""
+    """Writes the MEMORY.md that links those names."""
     d = os.path.join(root, project_dir, "memory")
     os.makedirs(d, exist_ok=True)
     lines = ["# Memory Index", ""]
@@ -110,7 +110,7 @@ def write_index(root, project_dir, names, extra=()):
 
 
 def memory_tree(root):
-    """Memorias variadas: indexada, sin listar, y un proyecto sin índice."""
+    """Varied memories: indexed, unlisted, and a project without an index."""
     write_memory(root, "-home-u-proj", "deploy-docker",
                  body="Se despliega con `make up`.\nVer [[roles-db]] y [[no-existe]].",
                  desc="Cómo se despliega el proyecto",
@@ -119,15 +119,15 @@ def memory_tree(root):
                  desc="Roles", kind="reference")
     write_memory(root, "-home-u-proj", "suelta", body="No está en el índice.",
                  desc="Huérfana")
-    # El índice lista dos reales y una que ya no existe.
+    # The index lists two real ones and one that no longer exists.
     write_index(root, "-home-u-proj", ["deploy-docker", "roles-db"],
                 extra=["borrada-hace-rato"])
 
-    # Otro proyecto con memoria pero sin MEMORY.md.
+    # Another project with memory but no MEMORY.md.
     write_memory(root, "-home-u-otro", "sin-indice", body="Nadie me indexa.",
                  desc="Sin índice", kind="user",
                  origin="ffffffff-0000-0000-0000-00000000000f")
 
-    # Un memory/ vacío no cuenta como proyecto con memoria.
+    # An empty memory/ does not count as a project with memory.
     os.makedirs(os.path.join(root, "-home-u-vacio", "memory"), exist_ok=True)
     return root

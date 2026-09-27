@@ -1,4 +1,4 @@
-"""Interfaz de línea de comandos."""
+"""Command-line interface."""
 
 import argparse
 import io
@@ -22,7 +22,7 @@ from . import webpage
 
 DEFAULT_HTML = "sesiones.html"
 
-# Una sesión escrita hace menos de esto puede estar abierta en otra terminal.
+# A session written less than this long ago may be open in another terminal.
 RECENT_SECONDS = 300
 
 EPILOG = """\
@@ -85,32 +85,32 @@ def build_parser():
                     help="no usa $PAGER para el chat")
     ap.add_argument("--no-color", action="store_true", help="salida sin color")
 
-    recuerdos = ap.add_argument_group("memoria de los proyectos")
-    recuerdos.add_argument("-m", "--memory", action="store_true",
+    memories_list = ap.add_argument_group("memoria de los proyectos")
+    memories_list.add_argument("-m", "--memory", action="store_true",
                            help="trabaja sobre las memorias en vez de las sesiones")
-    recuerdos.add_argument("--type", metavar="TIPO", choices=mem.TYPES,
+    memories_list.add_argument("--type", metavar="TIPO", choices=mem.TYPES,
                            help="filtra por tipo: " + " | ".join(mem.TYPES))
-    recuerdos.add_argument("--check", action="store_true",
+    memories_list.add_argument("--check", action="store_true",
                            help="audita índices, enlaces y sesiones de origen")
 
-    salida = ap.add_argument_group("exportar")
-    salida.add_argument("--json", action="store_true",
+    output_path = ap.add_argument_group("exportar")
+    output_path.add_argument("--json", action="store_true",
                         help="vuelca todas las sesiones en JSON")
-    salida.add_argument("--html", nargs="?", const=DEFAULT_HTML, metavar="ARCHIVO",
+    output_path.add_argument("--html", nargs="?", const=DEFAULT_HTML, metavar="ARCHIVO",
                         help=f"genera una página autocontenida (por defecto {DEFAULT_HTML})")
-    salida.add_argument("--template", metavar="ARCHIVO",
+    output_path.add_argument("--template", metavar="ARCHIVO",
                         help="usa otro template para --html")
-    salida.add_argument("--open", action="store_true",
+    output_path.add_argument("--open", action="store_true",
                         help="abre en el navegador lo que genere --html")
 
-    borrar = ap.add_argument_group("borrado")
-    borrar.add_argument("-D", "--delete", metavar="REF", nargs="+",
+    delete_items = ap.add_argument_group("borrado")
+    delete_items.add_argument("-D", "--delete", metavar="REF", nargs="+",
                         help="borra esas sesiones (índice o prefijo de UUID)")
-    borrar.add_argument("--delete-empty", action="store_true",
+    delete_items.add_argument("--delete-empty", action="store_true",
                         help="borra todas las sesiones sin mensajes")
-    borrar.add_argument("-y", "--yes", action="store_true",
+    delete_items.add_argument("-y", "--yes", action="store_true",
                         help="no pregunta antes de borrar")
-    borrar.add_argument("--dry-run", action="store_true",
+    delete_items.add_argument("--dry-run", action="store_true",
                         help="muestra qué se borraría y no toca nada")
 
     ap.add_argument("--no-cache", action="store_true",
@@ -130,10 +130,10 @@ def filtered(sessions, args):
     )
 
 
-# ──────────────────────────────── borrado ────────────────────────────────
+# ──────────────────────────────── deletion ───────────────────────────────
 
 def confirm(question):
-    """Pregunta s/N. Sin terminal no hay confirmación posible: devuelve False."""
+    """Asks y/N. Without a terminal no confirmation is possible: returns False."""
     try:
         tty = open("/dev/tty")
     except OSError:
@@ -149,7 +149,7 @@ def confirm(question):
 
 
 def delete_sessions(targets, args, st):
-    """Borra las sesiones dadas. Devuelve el código de salida."""
+    """Deletes the given sessions. Returns the exit code."""
     if not targets:
         print("No hay sesiones que borrar con ese criterio.", file=sys.stderr)
         return 0
@@ -177,8 +177,8 @@ def delete_sessions(targets, args, st):
     print(f"\n{st.faint}{fmt_size(total_kb)} en total{st.reset}")
 
     if recent:
-        verbo = "se escribió" if len(recent) == 1 else "se escribieron"
-        print(f"\n{st.copper}Ojo: {len(recent)} de estas {verbo} hace menos de "
+        verb = "se escribió" if len(recent) == 1 else "se escribieron"
+        print(f"\n{st.copper}Ojo: {len(recent)} de estas {verb} hace menos de "
               f"5 minutos. Si es una sesión abierta ahora mismo, Claude Code la "
               f"sigue usando y va a volver a escribirla al cerrarse.{st.reset}")
 
@@ -210,7 +210,7 @@ def delete_sessions(targets, args, st):
 
 
 def delete_targets(pool, args):
-    """Las sesiones que pidió borrar, sin repetidas y en el orden pedido."""
+    """The sessions the user asked to delete, without duplicates and in the requested order."""
     targets, seen = [], set()
 
     if args.delete_empty:
@@ -228,7 +228,7 @@ def delete_targets(pool, args):
     return targets
 
 
-# ──────────────────────────────── comandos ────────────────────────────────
+# ──────────────────────────────── commands ────────────────────────────────
 
 def cmd_json(sessions):
     import json
@@ -447,7 +447,7 @@ def main(argv=None):
         print(f"error: {e}", file=sys.stderr)
         return 2
     except (BrokenPipeError, KeyboardInterrupt):
-        # El pipe ya está cerrado: silenciamos el flush de salida al terminar.
+        # The pipe is already closed: silence the output flush at exit.
         try:
             sys.stdout.close()
         except Exception:
