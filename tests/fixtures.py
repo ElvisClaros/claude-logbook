@@ -56,23 +56,23 @@ def write_session(root, project_dir, session_id, events):
 def simple_tree(root):
     """A small, varied tree: a chat, an empty one and one without cwd."""
     write_session(root, "-home-u-proj", "aaaaaaaa-0000-0000-0000-000000000001", [
-        ai_title("Arreglar el build"),
-        user("¿por qué falla el build?", at=ts(0)),
-        assistant("Miro el log.", tools=[("Bash", {"command": "make"})], at=ts(3)),
-        user("gracias", at=ts(12)),
+        ai_title("Fix the build"),
+        user("why does the build fail?", at=ts(0)),
+        assistant("Checking the log.", tools=[("Bash", {"command": "make"})], at=ts(3)),
+        user("thanks", at=ts(12)),
     ])
     write_session(root, "-home-u-proj", "bbbbbbbb-0000-0000-0000-000000000002", [
         {"type": "system", "timestamp": ts(0, hour=9), "cwd": "/home/u/proj"},
     ])
-    write_session(root, "-home-u-otro", "cccccccc-0000-0000-0000-000000000003", [
-        user("hola", at=ts(0, hour=8), cwd="/home/u/otro"),
+    write_session(root, "-home-u-other", "cccccccc-0000-0000-0000-000000000003", [
+        user("hello", at=ts(0, hour=8), cwd="/home/u/other"),
     ])
     return root
 
 
 # ──────────────────────────────── memories ────────────────────────────────
 
-def write_memory(root, project_dir, name, body="cuerpo", desc=None,
+def write_memory(root, project_dir, name, body="body text", desc=None,
                  kind="project", origin=None, frontmatter=True):
     """Writes <project>/memory/<name>.md and returns its path."""
     d = os.path.join(root, project_dir, "memory")
@@ -81,14 +81,14 @@ def write_memory(root, project_dir, name, body="cuerpo", desc=None,
 
     parts = []
     if frontmatter:
-        campos = ["---", f"name: {name}"]
+        fields = ["---", f"name: {name}"]
         if desc is not None:
-            campos.append(f"description: {desc}")
-        campos += ["metadata:", "  node_type: memory", f"  type: {kind}"]
+            fields.append(f"description: {desc}")
+        fields += ["metadata:", "  node_type: memory", f"  type: {kind}"]
         if origin:
-            campos.append(f"  originSessionId: {origin}")
-        campos.append("---")
-        parts.append("\n".join(campos))
+            fields.append(f"  originSessionId: {origin}")
+        fields.append("---")
+        parts.append("\n".join(fields))
     parts.append(body)
 
     with open(path, "w", encoding="utf-8") as f:
@@ -102,7 +102,7 @@ def write_index(root, project_dir, names, extra=()):
     os.makedirs(d, exist_ok=True)
     lines = ["# Memory Index", ""]
     for n in list(names) + list(extra):
-        lines.append(f"- [{n}]({n}.md) — pista de {n}")
+        lines.append(f"- [{n}]({n}.md) — hint for {n}")
     path = os.path.join(d, "MEMORY.md")
     with open(path, "w", encoding="utf-8") as f:
         f.write("\n".join(lines) + "\n")
@@ -112,22 +112,22 @@ def write_index(root, project_dir, names, extra=()):
 def memory_tree(root):
     """Varied memories: indexed, unlisted, and a project without an index."""
     write_memory(root, "-home-u-proj", "deploy-docker",
-                 body="Se despliega con `make up`.\nVer [[roles-db]] y [[no-existe]].",
-                 desc="Cómo se despliega el proyecto",
+                 body="Deployed with `make up`.\nSee [[roles-db]] and [[missing]].",
+                 desc="How the project is deployed",
                  origin="aaaaaaaa-0000-0000-0000-000000000001")
-    write_memory(root, "-home-u-proj", "roles-db", body="Roles de la base.",
+    write_memory(root, "-home-u-proj", "roles-db", body="Database roles.",
                  desc="Roles", kind="reference")
-    write_memory(root, "-home-u-proj", "suelta", body="No está en el índice.",
-                 desc="Huérfana")
+    write_memory(root, "-home-u-proj", "stray", body="Not in the index.",
+                 desc="Orphan")
     # The index lists two real ones and one that no longer exists.
     write_index(root, "-home-u-proj", ["deploy-docker", "roles-db"],
-                extra=["borrada-hace-rato"])
+                extra=["deleted-long-ago"])
 
     # Another project with memory but no MEMORY.md.
-    write_memory(root, "-home-u-otro", "sin-indice", body="Nadie me indexa.",
-                 desc="Sin índice", kind="user",
+    write_memory(root, "-home-u-other", "no-index", body="Nobody indexes me.",
+                 desc="No index", kind="user",
                  origin="ffffffff-0000-0000-0000-00000000000f")
 
     # An empty memory/ does not count as a project with memory.
-    os.makedirs(os.path.join(root, "-home-u-vacio", "memory"), exist_ok=True)
+    os.makedirs(os.path.join(root, "-home-u-empty", "memory"), exist_ok=True)
     return root

@@ -51,8 +51,8 @@ def render(records, memories=None, template=None):
     # contains it as text. Validate the template before substituting.
     if html.count(MARKER) != 1:
         raise TemplateError(
-            f"el template debe tener exactamente un {MARKER} "
-            f"(encontrados: {html.count(MARKER)})")
+            f"the template must contain exactly one {MARKER} "
+            f"(found: {html.count(MARKER)})")
     return html.replace(MARKER, encode_payload(build_payload(records, memories)))
 
 
@@ -66,9 +66,9 @@ def write(records, out_path, memories=None, template=None):
 
 def summary(records, memories=None):
     return {
-        "sesiones": len(records),
-        "proyectos": len({r["p"] for r in records}),
-        "mensajes": sum(r["u"] for r in records),
-        "bloques": sum(len(r["c"]) for r in records),
-        "memorias": len(memories or ()),
+        "sessions": len(records),
+        "projects": len({r["p"] for r in records}),
+        "messages": sum(r["u"] for r in records),
+        "blocks": sum(len(r["c"]) for r in records),
+        "memories": len(memories or ()),
     }

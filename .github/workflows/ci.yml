@@ -24,12 +24,12 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
 
-      # Sin dependencias a propósito: si algún día hace falta instalar algo
-      # para correr los tests, es que el proyecto dejó de ser stdlib-only.
+      # No dependencies on purpose: if installing something is ever needed
+      # to run the tests, the project is no longer stdlib-only.
       - name: Tests
         run: python -m unittest discover -s tests -t . -v
 
-      - name: Se instala y el comando arranca
+      - name: Installs and the command starts
         run: |
           pip install .
           claude-logbook --version

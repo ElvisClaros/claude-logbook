@@ -192,7 +192,7 @@ def pick(memories, ref):
         if 1 <= i <= len(memories):
             return memories[i - 1]
         raise SessionError(
-            f"el índice {i} está fuera de rango (hay {len(memories)} memorias)")
+            f"index {i} is out of range (there are {len(memories)} memories)")
 
     needle = ref.lower()
     hits = [m for m in memories if m["name"].lower().startswith(needle)]
@@ -201,10 +201,10 @@ def pick(memories, ref):
     if len(hits) == 1:
         return hits[0]
     if not hits:
-        raise SessionError(f"ninguna memoria coincide con '{ref}'")
+        raise SessionError(f"no memory matches '{ref}'")
     name_list = ", ".join(m["name"] for m in hits[:4])
     raise SessionError(
-        f"'{ref}' es ambiguo, coincide con {len(hits)}: {name_list}"
+        f"'{ref}' is ambiguous, it matches {len(hits)}: {name_list}"
         + (", …" if len(hits) > 4 else ""))
 
 
@@ -216,20 +216,20 @@ def audit(memories, sessions, root=None):
     session_ids = {s["id"] for s in sessions}
 
     report = {
-        "sin_indice": [m for m in memories if not m["hix"]],
-        "sin_listar": [m for m in memories if m["hix"] and not m["ix"]],
-        "enlaces_rotos": [(m, link) for m in memories
+        "no_index": [m for m in memories if not m["hix"]],
+        "unlisted": [m for m in memories if m["hix"] and not m["ix"]],
+        "broken_links": [(m, link) for m in memories
                           for link in m["ln"] if link not in known],
-        "origen_perdido": [m for m in memories
+        "lost_source": [m for m in memories
                            if m["src"] and m["src"] not in session_ids],
-        "indice_fantasma": [],
+        "ghost_entries": [],
     }
 
     for project_dir in sorted({m["project_dir"] for m in memories if m["hix"]}):
         real = {m["file"][:-3] for m in memories
                 if m["project_dir"] == project_dir}
         for missing in sorted(read_index(project_dir, root) - real):
-            report["indice_fantasma"].append((project_dir, missing))
+            report["ghost_entries"].append((project_dir, missing))
 
     return report
 

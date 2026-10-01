@@ -26,36 +26,36 @@ class MemoryCase(unittest.TestCase):
 
 class TestParsing(MemoryCase):
     def test_reads_frontmatter_and_body(self):
-        path = write_memory(self.root, "-home-u-proj", "una",
-                            body="el cuerpo", desc="qué es", kind="feedback",
+        path = write_memory(self.root, "-home-u-proj", "one",
+                            body="the body", desc="what it is", kind="feedback",
                             origin="abc123")
         m = memory.read_memory(path, "-home-u-proj")
-        self.assertEqual(m["name"], "una")
-        self.assertEqual(m["desc"], "qué es")
+        self.assertEqual(m["name"], "one")
+        self.assertEqual(m["desc"], "what it is")
         self.assertEqual(m["ty"], "feedback")
         self.assertEqual(m["src"], "abc123")
-        self.assertEqual(m["body"], "el cuerpo")
+        self.assertEqual(m["body"], "the body")
 
     def test_quoted_description_loses_the_escapes(self):
         # Claude writes the description as a YAML string when it contains quotes.
         path = write_memory(self.root, "-home-u-proj", "q",
-                            desc=r'"la máquina \"legion\" y algo"')
+                            desc=r'"the \"legion\" machine and more"')
         self.assertEqual(memory.read_memory(path, "-home-u-proj")["desc"],
-                         'la máquina "legion" y algo')
+                         'the "legion" machine and more')
 
     def test_no_frontmatter_falls_back_to_the_file_name(self):
-        path = write_memory(self.root, "-home-u-proj", "pelada",
-                            body="solo texto", frontmatter=False)
+        path = write_memory(self.root, "-home-u-proj", "bare",
+                            body="just text", frontmatter=False)
         m = memory.read_memory(path, "-home-u-proj")
-        self.assertEqual(m["name"], "pelada")
+        self.assertEqual(m["name"], "bare")
         self.assertEqual(m["ty"], "—")
-        self.assertEqual(m["body"], "solo texto")
+        self.assertEqual(m["body"], "just text")
 
     def test_collects_links_without_repeats(self):
         path = write_memory(self.root, "-home-u-proj", "l",
-                            body="[[uno]] y [[dos]] y otra vez [[uno]]")
+                            body="[[one]] and [[two]] and again [[one]]")
         self.assertEqual(memory.read_memory(path, "-home-u-proj")["ln"],
-                         ["dos", "uno"])
+                         ["one", "two"])
 
 
 class TestLoading(MemoryCase):
@@ -77,16 +77,16 @@ class TestLoading(MemoryCase):
     def test_ignores_empty_memory_directories(self):
         memory_tree(self.root)
         _, mems = self.load_items()
-        self.assertNotIn("-home-u-vacio", {m["project_dir"] for m in mems})
+        self.assertNotIn("-home-u-empty", {m["project_dir"] for m in mems})
 
     def test_marks_what_is_in_the_index(self):
         memory_tree(self.root)
         _, mems = self.load_items()
         by_name = {m["name"]: m for m in mems}
         self.assertTrue(by_name["deploy-docker"]["ix"])
-        self.assertFalse(by_name["suelta"]["ix"])
-        self.assertTrue(by_name["suelta"]["hix"])
-        self.assertFalse(by_name["sin-indice"]["hix"])
+        self.assertFalse(by_name["stray"]["ix"])
+        self.assertTrue(by_name["stray"]["hix"])
+        self.assertFalse(by_name["no-index"]["hix"])
 
     def test_sorts_by_date_descending(self):
         memory_tree(self.root)
@@ -116,15 +116,15 @@ class TestFilters(MemoryCase):
 
     def test_by_project(self):
         r = memory.apply_filters(self.mems, project="/home/u/proj")
-        self.assertNotIn("sin-indice", [m["name"] for m in r])
+        self.assertNotIn("no-index", [m["name"] for m in r])
 
     def test_query_reaches_the_body(self):
         r = memory.apply_filters(self.mems, query="make up")
         self.assertEqual([m["name"] for m in r], ["deploy-docker"])
 
     def test_query_also_checks_the_description(self):
-        r = memory.apply_filters(self.mems, query="huérfana")
-        self.assertEqual([m["name"] for m in r], ["suelta"])
+        r = memory.apply_filters(self.mems, query="orphan")
+        self.assertEqual([m["name"] for m in r], ["stray"])
 
 
 class TestPick(MemoryCase):
@@ -146,16 +146,16 @@ class TestPick(MemoryCase):
     def test_falls_back_to_substring(self):
         self.assertEqual(memory.pick(self.mems, "docker")["name"], "deploy-docker")
 
-    def test_sin_coincidencias(self):
+    def test_no_matches(self):
         with self.assertRaises(sessions.SessionError):
-            memory.pick(self.mems, "nada-que-ver")
+            memory.pick(self.mems, "nothing-like-it")
 
     def test_ambiguous(self):
-        write_memory(self.root, "-home-u-proj", "deploy-otro")
+        write_memory(self.root, "-home-u-proj", "deploy-other")
         _, mems = self.load_items()
         with self.assertRaises(sessions.SessionError) as ctx:
             memory.pick(mems, "deploy")
-        self.assertIn("ambiguo", str(ctx.exception))
+        self.assertIn("ambiguous", str(ctx.exception))
 
 
 class TestAudit(MemoryCase):
@@ -167,31 +167,31 @@ class TestAudit(MemoryCase):
         self.report = memory.audit(self.mems, self.ss, root=self.root)
 
     def test_project_without_index(self):
-        self.assertEqual([m["name"] for m in self.report["sin_indice"]],
-                         ["sin-indice"])
+        self.assertEqual([m["name"] for m in self.report["no_index"]],
+                         ["no-index"])
 
     def test_memory_outside_the_index(self):
-        self.assertEqual([m["name"] for m in self.report["sin_listar"]],
-                         ["suelta"])
+        self.assertEqual([m["name"] for m in self.report["unlisted"]],
+                         ["stray"])
 
     def test_index_entry_without_file(self):
-        self.assertEqual([n for _, n in self.report["indice_fantasma"]],
-                         ["borrada-hace-rato"])
+        self.assertEqual([n for _, n in self.report["ghost_entries"]],
+                         ["deleted-long-ago"])
 
     def test_broken_link(self):
-        broken = [link for _, link in self.report["enlaces_rotos"]]
-        self.assertEqual(broken, ["no-existe"])  # [[roles-db]] does resolve
+        broken = [link for _, link in self.report["broken_links"]]
+        self.assertEqual(broken, ["missing"])  # [[roles-db]] does resolve
 
     def test_lost_origin_session(self):
-        # deploy-docker points to a session that exists; sin-indice does not.
-        self.assertEqual([m["name"] for m in self.report["origen_perdido"]],
-                         ["sin-indice"])
+        # deploy-docker points to a session that exists; no-index does not.
+        self.assertEqual([m["name"] for m in self.report["lost_source"]],
+                         ["no-index"])
 
     def test_consistent_tree_reports_nothing(self):
-        is_clean = os.path.join(self._tmp.name, "limpio")
+        is_clean = os.path.join(self._tmp.name, "clean")
         os.makedirs(is_clean)
-        write_memory(is_clean, "-p", "sola", body="sin enlaces")
-        write_index(is_clean, "-p", ["sola"])
+        write_memory(is_clean, "-p", "lone", body="no links")
+        write_index(is_clean, "-p", ["lone"])
         mems = memory.load_memories([], root=is_clean)
         self.assertEqual(memory.audit_total(memory.audit(mems, [], root=is_clean)), 0)
 
@@ -217,12 +217,12 @@ class TestDeletion(MemoryCase):
         self.assertIn("roles-db", memory.read_index("-home-u-proj", self.root))
 
     def test_delete_one_that_was_not_indexed(self):
-        m = self.by_name("suelta")
+        m = self.by_name("stray")
         self.assertFalse(memory.delete(m, root=self.root))
         self.assertFalse(os.path.exists(memory.memory_path(m, self.root)))
 
     def test_delete_without_memory_md(self):
-        m = self.by_name("sin-indice")
+        m = self.by_name("no-index")
         self.assertFalse(memory.delete(m, root=self.root))
         self.assertFalse(os.path.exists(memory.memory_path(m, self.root)))
 

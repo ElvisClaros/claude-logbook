@@ -7,25 +7,28 @@ HTML autocontenida que se abre con doble clic.
 Español · **[English](README.md)** · Sin dependencias, solo biblioteca estándar.
 
 ```
-  #   SESIÓN                           RUTA                    FECHA  CUÁNDO     MSG    DUR ID
-  1 | Migrar el pool de conexiones a … /home/ana/api           16 ago hoy          4     9m 5d10f1ee
-  2 | Timeouts intermitentes en el he… /home/ana/api           16 ago hoy          2     3m 0f60f37a
-  3 | Reescribir el buscador con Fuse… /home/ana/web           15 ago ayer         7    18m b69c1fc2
-  4 | por qué tarda tanto npm ci       /home/ana/web           13 ago hace 3d      1    <1m d4d2a5be
-  5 | sesión abierta sin mens… [vacía] /home/ana/infra         08 ago hace 1sem    —    <1m e0a4300e
+  #   SESSION                        PATH                  DATE   WHEN       MSG    DUR ID
+  1 | Migrate the connection pool t… /home/ana/api         16 Aug today        4     9m 5d10f1ee
+  2 | Intermittent timeouts in the … /home/ana/api         16 Aug today        2     3m 0f60f37a
+  3 | Rewrite search with Fuse.js    /home/ana/web         15 Aug yesterday    7    18m b69c1fc2
+  4 | why is npm ci so slow          /home/ana/web         13 Aug 3d ago       1    <1m d4d2a5be
+  5 | session opened with n… [empty] /home/ana/infra       08 Aug 1w ago       —    <1m e0a4300e
 
-5 sesiones · 3 proyectos · -s <nº> para leer una
+5 sessions · 3 projects · -s <#> to read one
 ```
+
+> **La CLI, su salida y su ayuda están en inglés.** Este README es solo una
+> traducción. El comando lee archivos locales y nunca envía nada a ningún lado.
 
 ## ⚠️ Tus transcripciones son privadas
 
 `--json` y `--html` escriben **el texto completo de tus conversaciones y de las
 memorias de tus proyectos**:
-prompts, respuestas, rutas de archivos, nombres de ramas. El `sesiones.html` que
+prompts, respuestas, rutas de archivos, nombres de ramas. El `sessions.html` que
 sale es una copia legible de todo lo que escribiste alguna vez en Claude Code.
 
 No lo commitees, no lo subas, no lo pegues en un issue. El `.gitignore` del repo
-ya excluye `sesiones.html` y `data.json`, pero el archivo lo cuidás vos.
+ya excluye `sessions.html` y `data.json`, pero el archivo lo cuidás vos.
 
 ## Instalación
 
@@ -56,7 +59,7 @@ claude-logbook -s 5d10f1ee         # lo mismo, por prefijo de UUID
 claude-logbook -g "port already"   # busca dentro de las conversaciones
 claude-logbook -r 3                # imprime el comando para reanudarla
 eval "$(claude-logbook -r 3)"      # …o la reanuda directamente
-claude-logbook --html --open       # genera sesiones.html y lo abre
+claude-logbook --html --open       # genera sessions.html y lo abre
 claude-logbook -m                  # las memorias de tus proyectos
 ```
 
@@ -74,20 +77,20 @@ claude-logbook docker -s 2         # lee el 2º de esos tres
 | --- | --- |
 | `-s`, `--show REF` | Muestra un chat (índice de la tabla o prefijo de UUID). |
 | `-r`, `--resume REF` | Imprime `cd <proyecto> && claude --resume <uuid>`. |
-| `-g`, `--grep TEXTO` | Deja las sesiones cuya transcripción contenga `TEXTO`. |
-| `-p`, `--project RUTA` | Deja las sesiones cuya ruta de proyecto contenga `RUTA`. |
+| `-g`, `--grep TEXT` | Deja las sesiones cuya transcripción contenga `TEXT`. |
+| `-p`, `--project PATH` | Deja las sesiones cuya ruta de proyecto contenga `PATH`. |
 | `-n`, `--limit N` | Solo las N más recientes. |
 | `-E`, `--hide-empty` | Oculta las sesiones sin mensajes. |
 | `--no-tools` | En el chat, oculta las llamadas a herramientas. |
 | `--no-pager` | No manda el chat a `$PAGER`. |
 | `--no-color` | Salida sin color (también respeta `NO_COLOR`). |
 | `--json` | Vuelca todas las sesiones en JSON por stdout. |
-| `--html [ARCHIVO]` | Genera la página autocontenida (por defecto `sesiones.html`). |
-| `--template ARCHIVO` | Usa tu propio template para `--html`. |
+| `--html [FILE]` | Genera la página autocontenida (por defecto `sessions.html`). |
+| `--template FILE` | Usa tu propio template para `--html`. |
 | `--open` | Abre en el navegador lo que haya generado `--html`. |
 | `--no-cache` | Ignora el caché y re-parsea todo. |
 | `-m`, `--memory` | Trabaja sobre las memorias en vez de las sesiones. |
-| `--type TIPO` | Con `-m`: filtra por `project`, `user`, `feedback` o `reference`. |
+| `--type TYPE` | Con `-m`: filtra por `project`, `user`, `feedback` o `reference`. |
 | `--check` | Con `-m`: audita índices, enlaces y sesiones de origen. |
 
 ### Borrar sesiones
@@ -169,7 +172,7 @@ servidor, sin red, sin paso de build: lo copiás a otra máquina y sigue andando
   código, títulos y una línea por herramienta usada.
 - Botón para copiar el `cd … && claude --resume …` de cualquier sesión.
 - Tema claro y oscuro, con un botón que recuerda cuál elegiste.
-- Cada sesión tiene su propio fragmento de URL: `sesiones.html#5d10f1ee-…` abre
+- Cada sesión tiene su propio fragmento de URL: `sessions.html#5d10f1ee-…` abre
   esa conversación directamente.
 - Teclado: `/` o `Ctrl`+`K` enfoca el buscador, `Esc` lo limpia o cierra el lector.
 

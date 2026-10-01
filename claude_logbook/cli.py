@@ -20,101 +20,101 @@ from .terminal import (
 from . import memory as mem
 from . import webpage
 
-DEFAULT_HTML = "sesiones.html"
+DEFAULT_HTML = "sessions.html"
 
 # A session written less than this long ago may be open in another terminal.
 RECENT_SECONDS = 300
 
 EPILOG = """\
-ejemplos:
-  claude-logbook                     tabla de todas las sesiones
-  claude-logbook docker              filtra por título, ruta o rama
-  claude-logbook -s 3                lee el chat nº 3 de la tabla
-  claude-logbook -s 5d10f1ee         lo mismo, por prefijo de UUID
-  claude-logbook -g "port already"   busca dentro de las conversaciones
-  claude-logbook -r 3                comando para reanudar la nº 3
-  eval "$(claude-logbook -r 3)"      reanudarla directamente
-  claude-logbook --html --open       genera sesiones.html y lo abre
+examples:
+  claude-logbook                     table of every session
+  claude-logbook docker              filter by title, path or branch
+  claude-logbook -s 3                read chat #3 from the table
+  claude-logbook -s 5d10f1ee         same, by UUID prefix
+  claude-logbook -g "port already"   search inside the conversations
+  claude-logbook -r 3                command to resume #3
+  eval "$(claude-logbook -r 3)"      resume it right away
+  claude-logbook --html --open       write sessions.html and open it
 
-el nº es la posición en la tabla que estás viendo, así que si filtraste
-hay que repetir el filtro para leer esa fila:
+the # is the position in the table you are looking at, so if you filtered
+you have to repeat the filter to read that row:
 
-  claude-logbook docker              muestra 3 resultados
-  claude-logbook docker -s 2         lee el 2º de esos tres
+  claude-logbook docker              shows 3 results
+  claude-logbook docker -s 2         reads the 2nd of those three
 
-borrado (irreversible; pregunta antes, salvo con -y):
-  claude-logbook --delete-empty --dry-run   qué borraría
-  claude-logbook --delete-empty             borra las vacías
-  claude-logbook -D 101 -D e0a4300e         borra sesiones puntuales
-  claude-logbook -p /tmp --delete-empty     solo las vacías de ese proyecto
+deleting (irreversible; asks first unless -y):
+  claude-logbook --delete-empty --dry-run   what it would delete
+  claude-logbook --delete-empty             delete the empty ones
+  claude-logbook -D 101 -D e0a4300e         delete specific sessions
+  claude-logbook -p /tmp --delete-empty     only the empty ones in that project
 
-memoria de los proyectos (-m cambia de sesiones a memorias y reusa los mismos
-verbos: filtro, -s para leer, -D para borrar):
-  claude-logbook -m                  tabla de memorias
-  claude-logbook -m docker           busca en nombre, descripción y cuerpo
-  claude-logbook -m -s 3             lee la memoria nº 3
-  claude-logbook -m -s deadlock      lo mismo, por nombre
-  claude-logbook -m --check          audita índices, enlaces y orígenes
-  claude-logbook -m -D 3             la borra y la saca de MEMORY.md
+project memory (-m switches from sessions to memories and reuses the same
+verbs: filter, -s to read, -D to delete):
+  claude-logbook -m                  table of memories
+  claude-logbook -m docker           search name, description and body
+  claude-logbook -m -s 3             read memory #3
+  claude-logbook -m -s deadlock      same, by name
+  claude-logbook -m --check          audit indexes, links and sources
+  claude-logbook -m -D 3             delete it and drop it from MEMORY.md
 """
 
 
 def build_parser():
     ap = argparse.ArgumentParser(
         prog="claude-logbook",
-        description="Explorador de sesiones de Claude Code para la terminal.",
+        description="Claude Code session browser for the terminal.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=textwrap.dedent(EPILOG),
     )
-    ap.add_argument("query", nargs="*", help="texto a buscar en título, ruta o rama")
+    ap.add_argument("query", nargs="*", help="text to search in title, path or branch")
     ap.add_argument("-s", "--show", metavar="REF",
-                    help="muestra el chat: índice de la tabla o prefijo de UUID")
+                    help="show the chat: table index or UUID prefix")
     ap.add_argument("-r", "--resume", metavar="REF",
-                    help="imprime el comando para reanudar esa sesión")
-    ap.add_argument("-g", "--grep", metavar="TEXTO",
-                    help="filtra por contenido de las conversaciones")
-    ap.add_argument("-p", "--project", metavar="RUTA",
-                    help="filtra por ruta del proyecto")
+                    help="print the command to resume that session")
+    ap.add_argument("-g", "--grep", metavar="TEXT",
+                    help="filter by conversation content")
+    ap.add_argument("-p", "--project", metavar="PATH",
+                    help="filter by project path")
     ap.add_argument("-n", "--limit", type=int, metavar="N",
-                    help="muestra solo las N más recientes")
+                    help="show only the N most recent")
     ap.add_argument("-E", "--hide-empty", action="store_true",
-                    help="oculta las sesiones sin mensajes")
+                    help="hide sessions with no messages")
     ap.add_argument("--no-tools", action="store_true",
-                    help="en el chat, oculta las llamadas a herramientas")
+                    help="hide tool calls in the chat")
     ap.add_argument("--no-pager", action="store_true",
-                    help="no usa $PAGER para el chat")
-    ap.add_argument("--no-color", action="store_true", help="salida sin color")
+                    help="do not use $PAGER for the chat")
+    ap.add_argument("--no-color", action="store_true", help="plain output, no color")
 
-    memories_list = ap.add_argument_group("memoria de los proyectos")
+    memories_list = ap.add_argument_group("project memory")
     memories_list.add_argument("-m", "--memory", action="store_true",
-                           help="trabaja sobre las memorias en vez de las sesiones")
-    memories_list.add_argument("--type", metavar="TIPO", choices=mem.TYPES,
-                           help="filtra por tipo: " + " | ".join(mem.TYPES))
+                           help="work on memories instead of sessions")
+    memories_list.add_argument("--type", metavar="TYPE", choices=mem.TYPES,
+                           help="filter by type: " + " | ".join(mem.TYPES))
     memories_list.add_argument("--check", action="store_true",
-                           help="audita índices, enlaces y sesiones de origen")
+                           help="audit indexes, links and source sessions")
 
-    output_path = ap.add_argument_group("exportar")
+    output_path = ap.add_argument_group("export")
     output_path.add_argument("--json", action="store_true",
-                        help="vuelca todas las sesiones en JSON")
-    output_path.add_argument("--html", nargs="?", const=DEFAULT_HTML, metavar="ARCHIVO",
-                        help=f"genera una página autocontenida (por defecto {DEFAULT_HTML})")
-    output_path.add_argument("--template", metavar="ARCHIVO",
-                        help="usa otro template para --html")
+                        help="dump every session as JSON")
+    output_path.add_argument("--html", nargs="?", const=DEFAULT_HTML, metavar="FILE",
+                        help=f"write a self-contained page (default {DEFAULT_HTML})")
+    output_path.add_argument("--template", metavar="FILE",
+                        help="use another template for --html")
     output_path.add_argument("--open", action="store_true",
-                        help="abre en el navegador lo que genere --html")
+                        help="open what --html writes in the browser")
 
-    delete_items = ap.add_argument_group("borrado")
+    delete_items = ap.add_argument_group("delete")
     delete_items.add_argument("-D", "--delete", metavar="REF", nargs="+",
-                        help="borra esas sesiones (índice o prefijo de UUID)")
+                        help="delete those sessions (index or UUID prefix)")
     delete_items.add_argument("--delete-empty", action="store_true",
-                        help="borra todas las sesiones sin mensajes")
+                        help="delete every session with no messages")
     delete_items.add_argument("-y", "--yes", action="store_true",
-                        help="no pregunta antes de borrar")
+                        help="do not ask before deleting")
     delete_items.add_argument("--dry-run", action="store_true",
-                        help="muestra qué se borraría y no toca nada")
+                        help="show what would be deleted and touch nothing")
 
     ap.add_argument("--no-cache", action="store_true",
-                    help="ignora el caché y re-parsea todo")
+                    help="ignore the cache and re-parse everything")
     ap.add_argument("--version", action="version",
                     version=f"claude-logbook {__version__}")
     return ap
@@ -141,7 +141,7 @@ def confirm(question):
     try:
         sys.stderr.write(question)
         sys.stderr.flush()
-        return tty.readline().strip().lower() in ("s", "si", "sí", "y", "yes")
+        return tty.readline().strip().lower() in ("y", "yes")
     except (OSError, KeyboardInterrupt):
         return False
     finally:
@@ -151,45 +151,45 @@ def confirm(question):
 def delete_sessions(targets, args, st):
     """Deletes the given sessions. Returns the exit code."""
     if not targets:
-        print("No hay sesiones que borrar con ese criterio.", file=sys.stderr)
+        print("No sessions to delete with those criteria.", file=sys.stderr)
         return 0
 
-    print(f"{st.bold}Se van a borrar "
-          f"{plural(len(targets), 'sesión', 'sesiones')}:{st.reset}\n")
+    print(f"{st.bold}About to delete "
+          f"{plural(len(targets), 'session', 'sessions')}:{st.reset}\n")
 
     total_kb = 0
     recent = []
     for s in targets:
         path = session_path(s)
         total_kb += s["k"]
-        title = s["t"] or "sesión abierta sin mensajes"
+        title = s["t"] or "session opened with no messages"
         flag = ""
         try:
             if time.time() - os.stat(path).st_mtime < RECENT_SECONDS:
                 recent.append(s)
-                flag = f" {st.copper}← modificada hace menos de 5 min{st.reset}"
+                flag = f" {st.copper}← modified less than 5 min ago{st.reset}"
         except OSError:
-            flag = f" {st.copper}← ya no existe{st.reset}"
+            flag = f" {st.copper}← no longer exists{st.reset}"
         print(f"  {st.faint}{s['id'][:8]}{st.reset} {clip(title, 52):<52} "
               f"{st.grey}{clip(s['p'], 34):<34}{st.reset} "
               f"{fmt_date(s['l'])} {st.faint}{s['k']:>7.1f} KB{st.reset}{flag}")
 
-    print(f"\n{st.faint}{fmt_size(total_kb)} en total{st.reset}")
+    print(f"\n{st.faint}{fmt_size(total_kb)} in total{st.reset}")
 
     if recent:
-        verb = "se escribió" if len(recent) == 1 else "se escribieron"
-        print(f"\n{st.copper}Ojo: {len(recent)} de estas {verb} hace menos de "
-              f"5 minutos. Si es una sesión abierta ahora mismo, Claude Code la "
-              f"sigue usando y va a volver a escribirla al cerrarse.{st.reset}")
+        verb = "was" if len(recent) == 1 else "were"
+        print(f"\n{st.copper}Careful: {len(recent)} of these {verb} written less than "
+              f"5 minutes ago. If one is a session open right now, Claude Code is "
+              f"still using it and will write it again when it closes.{st.reset}")
 
     if args.dry_run:
-        print(f"\n{st.faint}--dry-run: no se tocó nada.{st.reset}")
+        print(f"\n{st.faint}--dry-run: nothing was touched.{st.reset}")
         return 0
 
     if not args.yes:
-        print(f"\n{st.copper}Esto no se puede deshacer.{st.reset}")
-        if not confirm("¿Confirmás? [s/N] "):
-            print("Cancelado.", file=sys.stderr)
+        print(f"\n{st.copper}This cannot be undone.{st.reset}")
+        if not confirm("Confirm? [y/N] "):
+            print("Cancelled.", file=sys.stderr)
             return 1
 
     done, failed, paths = 0, 0, []
@@ -205,7 +205,7 @@ def delete_sessions(targets, args, st):
 
     drop_from_cache(paths)
 
-    print(f"\n{plural(done, 'sesión borrada', 'sesiones borradas')}.")
+    print(f"\n{plural(done, 'session deleted', 'sessions deleted')}.")
     return 1 if failed else 0
 
 
@@ -245,9 +245,9 @@ def cmd_html(sessions, args):
     memories = mem.public_records(mem.load_memories(sessions))
     stats = webpage.write(public_records(sessions), out, memories=memories,
                           template=webpage.template_text(args.template))
-    print(f"{stats['sesiones']} sesiones · {stats['proyectos']} proyectos · "
-          f"{stats['mensajes']} mensajes · {stats['bloques']} bloques "
-          f"de transcripción · {stats['memorias']} memorias → {out}",
+    print(f"{stats['sessions']} sessions · {stats['projects']} projects · "
+          f"{stats['messages']} messages · {stats['blocks']} transcript "
+          f"blocks · {stats['memories']} memories → {out}",
           file=sys.stderr)
     if args.open:
         webbrowser.open("file://" + os.path.abspath(out))
@@ -270,7 +270,7 @@ def cmd_show(sessions, args, st):
 def cmd_table(sessions, args, st):
     shown = filtered(sessions, args)
     if not shown:
-        print("Ninguna sesión coincide con ese filtro.", file=sys.stderr)
+        print("No session matches that filter.", file=sys.stderr)
         return 1
     if args.limit:
         shown = shown[: args.limit]
@@ -278,10 +278,10 @@ def cmd_table(sessions, args, st):
     print_table(shown, st, latest_activity(sessions), sys.stdout)
 
     total, projects = len(sessions), len({s["p"] for s in sessions})
-    tail = (f"{len(shown)} de {total} sesiones" if len(shown) != total
-            else f"{plural(total, 'sesión', 'sesiones')} · "
-                 f"{plural(projects, 'proyecto', 'proyectos')}")
-    print(f"\n{st.faint}{tail} · -s <nº> para leer una{st.reset}")
+    tail = (f"{len(shown)} of {total} sessions" if len(shown) != total
+            else f"{plural(total, 'session', 'sessions')} · "
+                 f"{plural(projects, 'project', 'projects')}")
+    print(f"\n{st.faint}{tail} · -s <#> to read one{st.reset}")
     return 0
 
 
@@ -308,22 +308,22 @@ def cmd_mem_check(memories, sessions, st):
     report = mem.audit(memories, sessions)
     total = print_audit(report, st, sys.stdout)
     if total:
-        print(f"{st.faint}{plural(total, 'cosa para mirar', 'cosas para mirar')} "
-              f"en {plural(len(memories), 'memoria', 'memorias')}.{st.reset}")
+        print(f"{st.faint}{plural(total, 'thing to look at', 'things to look at')} "
+              f"across {plural(len(memories), 'memory', 'memories')}.{st.reset}")
         return 1
-    print(f"{st.amber}Todo en orden: "
-          f"{plural(len(memories), 'memoria', 'memorias')}, "
-          f"índices y enlaces consistentes.{st.reset}")
+    print(f"{st.amber}All good: "
+          f"{plural(len(memories), 'memory', 'memories')}, "
+          f"indexes and links consistent.{st.reset}")
     return 0
 
 
 def delete_memories(targets, args, st):
     if not targets:
-        print("No hay memorias que borrar con ese criterio.", file=sys.stderr)
+        print("No memories to delete with those criteria.", file=sys.stderr)
         return 0
 
-    print(f"{st.bold}Se van a borrar "
-          f"{plural(len(targets), 'memoria', 'memorias')}:{st.reset}\n")
+    print(f"{st.bold}About to delete "
+          f"{plural(len(targets), 'memory', 'memories')}:{st.reset}\n")
     total_kb = 0
     for m in targets:
         total_kb += m["k"]
@@ -334,17 +334,17 @@ def delete_memories(targets, args, st):
         if m["desc"]:
             print(f"    {st.faint}{clip(m['desc'], 86)}{st.reset}")
 
-    print(f"\n{st.faint}{fmt_size(total_kb)} en total · "
-          f"también se quita su línea de MEMORY.md{st.reset}")
+    print(f"\n{st.faint}{fmt_size(total_kb)} in total · "
+          f"their MEMORY.md lines are removed too{st.reset}")
 
     if args.dry_run:
-        print(f"\n{st.faint}--dry-run: no se tocó nada.{st.reset}")
+        print(f"\n{st.faint}--dry-run: nothing was touched.{st.reset}")
         return 0
 
     if not args.yes:
-        print(f"\n{st.copper}Esto no se puede deshacer.{st.reset}")
-        if not confirm("¿Confirmás? [s/N] "):
-            print("Cancelado.", file=sys.stderr)
+        print(f"\n{st.copper}This cannot be undone.{st.reset}")
+        if not confirm("Confirm? [y/N] "):
+            print("Cancelled.", file=sys.stderr)
             return 1
 
     done = failed = unlisted = 0
@@ -357,31 +357,31 @@ def delete_memories(targets, args, st):
             print(f"error: {m['name']}: {e}", file=sys.stderr)
             failed += 1
 
-    extra = f", {unlisted} sacadas del índice" if unlisted else ""
-    print(f"\n{plural(done, 'memoria borrada', 'memorias borradas')}{extra}.")
+    extra = f", {unlisted} removed from the index" if unlisted else ""
+    print(f"\n{plural(done, 'memory deleted', 'memories deleted')}{extra}.")
     return 1 if failed else 0
 
 
 def cmd_mem_table(memories, args, st, total):
     if not memories:
-        print("Ninguna memoria coincide con ese filtro.", file=sys.stderr)
+        print("No memory matches that filter.", file=sys.stderr)
         return 1
     shown = memories[: args.limit] if args.limit else memories
 
     print_memories(shown, st, latest_activity(shown), sys.stdout)
 
     projects = len({m["p"] for m in memories})
-    tail = (f"{len(shown)} de {total} memorias" if len(shown) != total
-            else f"{plural(total, 'memoria', 'memorias')} · "
-                 f"{plural(projects, 'proyecto', 'proyectos')}")
-    print(f"\n{st.faint}{tail} · -m -s <nº> para leer una{st.reset}")
+    tail = (f"{len(shown)} of {total} memories" if len(shown) != total
+            else f"{plural(total, 'memory', 'memories')} · "
+                 f"{plural(projects, 'project', 'projects')}")
+    print(f"\n{st.faint}{tail} · -m -s <#> to read one{st.reset}")
     return 0
 
 
 def run_memory(sessions, args, st):
     memories = mem.load_memories(sessions)
     if not memories:
-        print("Ningún proyecto tiene memorias todavía.", file=sys.stderr)
+        print("No project has memories yet.", file=sys.stderr)
         return 1
 
     if args.check:
@@ -406,13 +406,13 @@ def run_memory(sessions, args, st):
 def run(args):
     root = default_root()
     if not os.path.isdir(root):
-        print(f"error: no existe {root} — ¿usaste Claude Code en esta máquina?",
+        print(f"error: {root} does not exist — have you used Claude Code on this machine?",
               file=sys.stderr)
         return 2
 
     sessions = load_sessions(root=root, use_cache=not args.no_cache)
     if not sessions:
-        print("No hay ninguna sesión registrada todavía.", file=sys.stderr)
+        print("No sessions recorded yet.", file=sys.stderr)
         return 1
 
     st = Style.from_stream(sys.stdout, args.no_color)

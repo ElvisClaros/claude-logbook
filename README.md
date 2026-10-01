@@ -6,29 +6,28 @@ page you open with a double click.
 
 **[Español](README.es.md)** · English · No dependencies, standard library only.
 
-> **The CLI, its output and its help text are in Spanish.** Only this README is
-> translated. The command reads local files and never sends anything anywhere.
-
 ```
-  #   SESIÓN                           RUTA                    FECHA  CUÁNDO     MSG    DUR ID
-  1 | Migrar el pool de conexiones a … /home/ana/api           16 ago hoy          4     9m 5d10f1ee
-  2 | Timeouts intermitentes en el he… /home/ana/api           16 ago hoy          2     3m 0f60f37a
-  3 | Reescribir el buscador con Fuse… /home/ana/web           15 ago ayer         7    18m b69c1fc2
-  4 | por qué tarda tanto npm ci       /home/ana/web           13 ago hace 3d      1    <1m d4d2a5be
-  5 | sesión abierta sin mens… [vacía] /home/ana/infra         08 ago hace 1sem    —    <1m e0a4300e
+  #   SESSION                        PATH                  DATE   WHEN       MSG    DUR ID
+  1 | Migrate the connection pool t… /home/ana/api         16 Aug today        4     9m 5d10f1ee
+  2 | Intermittent timeouts in the … /home/ana/api         16 Aug today        2     3m 0f60f37a
+  3 | Rewrite search with Fuse.js    /home/ana/web         15 Aug yesterday    7    18m b69c1fc2
+  4 | why is npm ci so slow          /home/ana/web         13 Aug 3d ago       1    <1m d4d2a5be
+  5 | session opened with n… [empty] /home/ana/infra       08 Aug 1w ago       —    <1m e0a4300e
 
-5 sesiones · 3 proyectos · -s <nº> para leer una
+5 sessions · 3 projects · -s <#> to read one
 ```
+
+The command reads local files and never sends anything anywhere.
 
 ## ⚠️ Your transcripts are private
 
 `--json` and `--html` write out **the full text of your conversations and your
 projects' memories**: prompts,
-answers, file paths, branch names. The generated `sesiones.html` is a complete,
+answers, file paths, branch names. The generated `sessions.html` is a complete,
 readable copy of everything you ever typed into Claude Code.
 
 Do not commit it, do not upload it, do not paste it into a bug report. The
-repository's `.gitignore` already excludes `sesiones.html` and `data.json`, but
+repository's `.gitignore` already excludes `sessions.html` and `data.json`, but
 the file itself is yours to look after.
 
 ## Install
@@ -60,7 +59,7 @@ claude-logbook -s 5d10f1ee         # same, by UUID prefix
 claude-logbook -g "port already"   # search inside the conversations
 claude-logbook -r 3                # print the command that resumes it
 eval "$(claude-logbook -r 3)"      # …or resume it right away
-claude-logbook --html --open       # build sesiones.html and open it
+claude-logbook --html --open       # build sessions.html and open it
 claude-logbook -m                  # your projects' memories
 ```
 
@@ -86,7 +85,7 @@ claude-logbook docker -s 2         # reads the 2nd of those three
 | `--no-pager` | Do not pipe the conversation through `$PAGER`. |
 | `--no-color` | Plain output (`NO_COLOR` is honoured too). |
 | `--json` | Dump every session as JSON on stdout. |
-| `--html [FILE]` | Build the standalone page (default `sesiones.html`). |
+| `--html [FILE]` | Build the standalone page (default `sessions.html`). |
 | `--template FILE` | Use your own template for `--html`. |
 | `--open` | Open whatever `--html` produced in your browser. |
 | `--no-cache` | Ignore the cache and re-parse everything. |
@@ -173,7 +172,7 @@ works.
   headings and one line per tool call.
 - Copy the `cd … && claude --resume …` command for any session.
 - Light and dark themes, with a toggle that remembers your choice.
-- Each session gets its own URL fragment, so `sesiones.html#5d10f1ee-…` opens
+- Each session gets its own URL fragment, so `sessions.html#5d10f1ee-…` opens
   that conversation directly.
 - Keyboard: `/` or `Ctrl`+`K` focuses the search box, `Esc` clears it or closes
   the reader.

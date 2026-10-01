@@ -142,7 +142,7 @@ def parse_ts(ts):
 
 def read_session(path):
     """Parses a whole .jsonl and returns that session's record."""
-    session_id = os.path.basename(path)[:-6]  # sin .jsonl
+    session_id = os.path.basename(path)[:-6]  # without .jsonl
     first_ts = last_ts = cwd = git_branch = version = None
     ai_title = fallback_title = None
     user_msgs = assistant_msgs = 0
@@ -399,11 +399,11 @@ def pick(sessions, ref):
         if 1 <= i <= len(sessions):
             return sessions[i - 1]
         raise SessionError(
-            f"el índice {i} está fuera de rango (hay {len(sessions)})")
+            f"index {i} is out of range (there are {len(sessions)})")
 
     hits = [s for s in sessions if s["id"].startswith(ref.lower())]
     if len(hits) == 1:
         return hits[0]
     if not hits:
-        raise SessionError(f"ninguna sesión empieza con '{ref}'")
-    raise SessionError(f"'{ref}' es ambiguo, coincide con {len(hits)} sesiones")
+        raise SessionError(f"no session starts with '{ref}'")
+    raise SessionError(f"'{ref}' is ambiguous, it matches {len(hits)} sessions")

@@ -9,8 +9,8 @@ import textwrap
 
 from .sessions import parse_ts
 
-MES = ["ene", "feb", "mar", "abr", "may", "jun",
-       "jul", "ago", "sep", "oct", "nov", "dic"]
+MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+          "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
 ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 
@@ -65,7 +65,7 @@ def clip(s, width):
 
 def fmt_date(iso):
     d = parse_ts(iso).astimezone()
-    return f"{d.day:02d} {MES[d.month - 1]}"
+    return f"{d.day:02d} {MONTHS[d.month - 1]}"
 
 
 def fmt_time(iso):
@@ -75,14 +75,14 @@ def fmt_time(iso):
 def fmt_rel(iso, now):
     n = (now - parse_ts(iso)).total_seconds() / 86400
     if n < 1:
-        return "hoy"
+        return "today"
     if n < 2:
-        return "ayer"
+        return "yesterday"
     if n < 7:
-        return f"hace {int(n)}d"
+        return f"{int(n)}d ago"
     if n < 30:
-        return f"hace {int(n // 7)}sem"
-    return f"hace {int(n // 30)}mes"
+        return f"{int(n // 7)}w ago"
+    return f"{int(n // 30)}mo ago"
 
 
 def plural(n, singular, plural_):
@@ -113,7 +113,7 @@ def stripe(iso, now, st):
     return f"{color}▌{st.reset}"
 
 
-# ──────────────────────────────── tabla ────────────────────────────────
+# ──────────────────────────────── table ────────────────────────────────
 
 def print_table(sessions, st, now, out, width=None):
     width = width or shutil.get_terminal_size((100, 24)).columns
@@ -129,11 +129,11 @@ def print_table(sessions, st, now, out, width=None):
 
     head = [
         f"{'#':>3}", " ",
-        f"{st.faint}{'SESIÓN':<{w_title}}{st.reset}",
+        f"{st.faint}{'SESSION':<{w_title}}{st.reset}",
     ]
     if show_path:
-        head.append(f"{st.faint}{'RUTA':<{w_path}}{st.reset}")
-    head.append(f"{st.faint}{'FECHA':<6} {'CUÁNDO':<9}{st.reset}")
+        head.append(f"{st.faint}{'PATH':<{w_path}}{st.reset}")
+    head.append(f"{st.faint}{'DATE':<6} {'WHEN':<9}{st.reset}")
     head.append(f"{st.faint}{'MSG':>4}{st.reset}")
     if show_dur:
         head.append(f"{st.faint}{'DUR':>6}{st.reset}")
@@ -141,11 +141,11 @@ def print_table(sessions, st, now, out, width=None):
     print(" ".join(head), file=out)
 
     for i, s in enumerate(sessions, 1):
-        title = s["t"] or "sesión abierta sin mensajes"
+        title = s["t"] or "session opened with no messages"
         tcolor = st.dim + st.italic if s["e"] else (st.ink if s["ai"] else "")
         tags = ""
         if s["e"]:
-            tags = f" {st.faint}[vacía]{st.reset}"
+            tags = f" {st.faint}[empty]{st.reset}"
         elif s["n"]:
             tags = f" {st.faint}[auto]{st.reset}"
 
@@ -200,15 +200,15 @@ def print_chat(s, st, out, show_tools=True, width=None):
     width = min(width or shutil.get_terminal_size((100, 24)).columns, 100)
     body = width - 2
 
-    print(f"{st.amber}{st.bold}{s['t'] or 'Sesión sin título'}{st.reset}", file=out)
+    print(f"{st.amber}{st.bold}{s['t'] or 'Untitled session'}{st.reset}", file=out)
     meta = (f"{s['p']}  ·  {fmt_date(s['l'])} {fmt_time(s['l'])}  ·  "
-            f"{s['u']} tuyos / {s['a']} de Claude  ·  {fmt_dur(s['d'])}")
+            f"{s['u']} yours / {s['a']} from Claude  ·  {fmt_dur(s['d'])}")
     print(f"{st.faint}{meta}{st.reset}", file=out)
     print(f"{st.faint}{resume_cmd(s)}{st.reset}", file=out)
     print(f"{st.faint}{'─' * min(width, 80)}{st.reset}\n", file=out)
 
     if not s["c"]:
-        print(f"{st.dim}Esta sesión no tiene mensajes.{st.reset}", file=out)
+        print(f"{st.dim}This session has no messages.{st.reset}", file=out)
         return
 
     first = True
@@ -225,7 +225,7 @@ def print_chat(s, st, out, show_tools=True, width=None):
             print(file=out)
         first = False
 
-        who = "vos" if m["r"] == "u" else "claude"
+        who = "you" if m["r"] == "u" else "claude"
         color = st.amber if m["r"] == "u" else st.blue
         print(f"{color}{who}{st.reset}", file=out)
         for line in render_block(m["x"], st, body, st.grey):
@@ -278,13 +278,13 @@ def print_memories(memories, st, now, out, width=None):
         w_name, w_project = flex, 0
     w_desc = flex - w_name - w_project if show_desc else 0
 
-    head = [f"{'#':>3}", f"{st.faint}{'MEMORIA':<{w_name}}{st.reset}",
-            f"{st.faint}{'TIPO':<9}{st.reset}"]
+    head = [f"{'#':>3}", f"{st.faint}{'MEMORY':<{w_name}}{st.reset}",
+            f"{st.faint}{'TYPE':<9}{st.reset}"]
     if show_project:
-        head.append(f"{st.faint}{'PROYECTO':<{w_project}}{st.reset}")
+        head.append(f"{st.faint}{'PROJECT':<{w_project}}{st.reset}")
     if show_desc:
-        head.append(f"{st.faint}{'DESCRIPCIÓN':<{w_desc}}{st.reset}")
-    head.append(f"{st.faint}{'FECHA':<6} {'CUÁNDO':<9}{st.reset}")
+        head.append(f"{st.faint}{'DESCRIPTION':<{w_desc}}{st.reset}")
+    head.append(f"{st.faint}{'DATE':<6} {'WHEN':<9}{st.reset}")
     print(" ".join(head), file=out)
 
     for i, m in enumerate(memories, 1):
@@ -321,8 +321,8 @@ def print_memory(m, st, out, path=None, width=None):
         print(f"{st.faint}{path}{st.reset}", file=out)
 
     if not m["ix"]:
-        warning = ("este proyecto no tiene MEMORY.md" if not m["hix"]
-                 else "no figura en MEMORY.md, así que no se carga en contexto")
+        warning = ("this project has no MEMORY.md" if not m["hix"]
+                 else "not listed in MEMORY.md, so it is not loaded into context")
         print(f"{st.copper}* {warning}{st.reset}", file=out)
 
     print(f"{st.faint}{'─' * min(width, 80)}{st.reset}\n", file=out)
@@ -331,29 +331,29 @@ def print_memory(m, st, out, path=None, width=None):
         print(line, file=out)
 
     if m["ln"]:
-        print(f"\n{st.faint}enlaces: {', '.join(m['ln'])}{st.reset}", file=out)
+        print(f"\n{st.faint}links: {', '.join(m['ln'])}{st.reset}", file=out)
     if m["src"]:
-        print(f"{st.faint}la creó la sesión {m['src'][:8]}  "
+        print(f"{st.faint}created by session {m['src'][:8]}  "
               f"(claude-logbook -s {m['src'][:8]}){st.reset}", file=out)
 
 
 def print_audit(report, st, out):
     """Inconsistency report. Returns how many were listed."""
     blocks = (
-        ("sin_indice", "Proyectos con memorias pero sin MEMORY.md",
-         "sin índice no se carga ninguna de sus memorias",
+        ("no_index", "Projects with memories but no MEMORY.md",
+         "without an index none of their memories are loaded",
          lambda m: f"{clip(m['name'], 38):<38} {st.grey}{m['p']}{st.reset}"),
-        ("sin_listar", "Memorias que no figuran en su MEMORY.md",
-         "el índice es lo que se lee al arrancar: si no está, no se recuerda",
+        ("unlisted", "Memories not listed in their MEMORY.md",
+         "the index is what gets read at startup: if it is not there, it is not remembered",
          lambda m: f"{clip(m['name'], 38):<38} {st.grey}{m['p']}{st.reset}"),
-        ("indice_fantasma", "Entradas del índice sin archivo",
-         "apuntan a una memoria que ya no existe",
+        ("ghost_entries", "Index entries without a file",
+         "they point to a memory that no longer exists",
          lambda t: f"{clip(t[1], 38):<38} {st.grey}{t[0]}{st.reset}"),
-        ("enlaces_rotos", "Enlaces [[...]] sin destino",
-         "el formato los permite: marcan algo que todavía no se escribió",
+        ("broken_links", "[[...]] links without a target",
+         "the format allows them: they mark something not written yet",
          lambda t: f"{clip(t[0]['name'], 38):<38} {st.grey}→ [[{t[1]}]]{st.reset}"),
-        ("origen_perdido", "Memorias cuya sesión de origen ya no existe",
-         "la memoria sobrevivió a la conversación que la creó",
+        ("lost_source", "Memories whose source session no longer exists",
+         "the memory outlived the conversation that created it",
          lambda m: f"{clip(m['name'], 38):<38} {st.grey}{m['src'][:8]}{st.reset}"),
     )
 
