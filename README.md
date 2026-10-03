@@ -61,6 +61,7 @@ claude-logbook -r 3                # print the command that resumes it
 eval "$(claude-logbook -r 3)"      # …or resume it right away
 claude-logbook --html --open       # build sessions.html and open it
 claude-logbook -m                  # your projects' memories
+claude-logbook -P                  # permissions, extra directories and trust
 ```
 
 The number is the row's position **in the table you are looking at**, so if you
@@ -92,6 +93,12 @@ claude-logbook docker -s 2         # reads the 2nd of those three
 | `-m`, `--memory` | Work on memories instead of sessions. |
 | `--type KIND` | With `-m`: filter by `project`, `user`, `feedback` or `reference`. |
 | `--check` | With `-m`: audit indexes, links and origin sessions. |
+| `-P`, `--perms` | List permission rules, extra directories and folder trust. |
+| `--allow`, `--ask`, `--deny RULE` | Add a permission rule (see below). |
+| `--remove-rule RULE` | Remove a rule from `allow`, `ask` and `deny`. |
+| `--add-dir`, `--remove-dir DIR` | Edit `additionalDirectories`. |
+| `--trust`, `--untrust` | Accept or reset the trust dialog of the `-p` project. |
+| `--scope SCOPE` | Settings file to change: `user`, `project` or `local`. |
 
 ### Deleting sessions
 
@@ -158,6 +165,44 @@ pointing at nothing.
 claude-logbook -m -D 3 --dry-run   # what it would delete
 claude-logbook -m -D deploy-docker # delete that memory
 ```
+
+## Permissions
+
+Claude Code keeps its permission rules in `settings.json` files and the
+"do you trust this folder?" answer in `~/.claude.json`. `-P` shows them all
+together, and a handful of flags edit them without opening any JSON:
+
+```bash
+claude-logbook -P                          # user rules + every project with rules
+claude-logbook -P -p api                   # one project, with or without rules
+claude-logbook --allow "Bash(npm test:*)" -p .
+claude-logbook --deny "Read(./.env)" --scope project -p .
+claude-logbook --remove-rule WebFetch      # out of allow, ask and deny
+claude-logbook --add-dir ~/shared -p .     # additionalDirectories
+claude-logbook --trust -p ~/code/api       # mark that folder as trusted
+claude-logbook --untrust -p ~/code/api     # Claude Code will ask again
+```
+
+Where each change goes:
+
+| What | File |
+| --- | --- |
+| Rules and directories, no `-p` | `~/.claude/settings.json` (user scope) |
+| Rules and directories with `-p` | `<project>/.claude/settings.local.json` (personal) |
+| Same, with `--scope project` | `<project>/.claude/settings.json` (usually committed) |
+| `--trust` / `--untrust` | `hasTrustDialogAccepted` in `~/.claude.json` |
+
+`-p` takes a directory, or any piece of a project path Claude Code has seen as
+long as it matches only one. Rules use Claude Code's syntax: `Tool` or
+`Tool(specifier)`. A rule lives in one list only, so `--deny X` takes `X` out of
+`allow` and `ask`. Every other key in those files is kept as it was, the file is
+replaced atomically with its permissions intact, and `--dry-run` shows the
+change without making it. Sessions that are already open may need a restart to
+notice.
+
+`~/.claude.json` also holds your account and the state of every running Claude
+Code, which rewrite it often: claude-logbook reads it right before changing it,
+and retries if it moves in between.
 
 ## The HTML page
 
@@ -277,6 +322,7 @@ The tests build fake `.jsonl` trees in a temporary directory and never touch
 | --- | --- |
 | `claude_logbook/sessions.py` | Parsing the `.jsonl` files, the cache, filters. |
 | `claude_logbook/memory.py` | Reading the `memory/*.md` files and auditing them. |
+| `claude_logbook/config.py` | Permission rules, extra directories and folder trust. |
 | `claude_logbook/terminal.py` | ANSI colours, the table, printing a conversation. |
 | `claude_logbook/webpage.py` | Embedding the data into the template. |
 | `claude_logbook/cli.py` | Argument parsing and the commands. |

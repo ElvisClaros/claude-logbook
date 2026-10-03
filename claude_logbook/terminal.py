@@ -7,6 +7,7 @@ import subprocess
 import sys
 import textwrap
 
+from .config import is_empty
 from .sessions import parse_ts
 
 MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -370,3 +371,60 @@ def print_audit(report, st, out):
         print(file=out)
 
     return total
+
+
+# ──────────────────────────────── permissions ────────────────────────────
+
+RULE_COLOR = {"allow": "amber", "ask": "blue", "deny": "copper", "dirs": "grey",
+              "mode": "grey"}
+
+
+def _print_rules(r, st, out, indent):
+    for key in ("allow", "ask", "deny", "dirs"):
+        color = getattr(st, RULE_COLOR[key])
+        for i, item in enumerate(r[key]):
+            label = key if i == 0 else ""
+            print(f"{indent}{st.faint}{label:<6}{st.reset} {color}{item}{st.reset}",
+                  file=out)
+    if r["mode"]:
+        print(f"{indent}{st.faint}{'mode':<6}{st.reset} {r['mode']}", file=out)
+
+
+def short_home(path):
+    home = os.path.expanduser("~")
+    return "~" + path[len(home):] if path == home or path.startswith(home + "/") else path
+
+
+def trust_label(p, st):
+    if p["trusted"]:
+        return f"{st.amber}trusted{st.reset}"
+    if p["parent"]:
+        return f"{st.faint}not trusted · parent {short_home(p['parent'])} is{st.reset}"
+    return f"{st.copper}not trusted{st.reset}"
+
+
+def print_permissions(view, st, out, show_all=False):
+    """User scope, then each project with rules (or every one if show_all)."""
+    user = view["user"]
+    print(f"{st.bold}user{st.reset}  {st.faint}{short_home(user['path'])}{st.reset}",
+          file=out)
+    if is_empty(user["rules"]):
+        print(f"  {st.faint}no rules{st.reset}", file=out)
+    else:
+        _print_rules(user["rules"], st, out, "  ")
+
+    shown = 0
+    for p in view["projects"]:
+        with_rules = [s for s in p["scopes"] if not is_empty(s["rules"])]
+        if not with_rules and not show_all:
+            continue
+        shown += 1
+        gone = "" if p["exists"] else f"  {st.faint}(directory gone){st.reset}"
+        print(f"\n{st.ink}{short_home(p['path'])}{st.reset}  {trust_label(p, st)}{gone}",
+              file=out)
+        for s in with_rules:
+            name = os.path.relpath(s["path"], p["path"])
+            print(f"  {st.grey}{s['scope']:<7}{st.reset} {st.faint}{name}{st.reset}",
+                  file=out)
+            _print_rules(s["rules"], st, out, "    ")
+    return shown

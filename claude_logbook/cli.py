@@ -15,8 +15,10 @@ from .sessions import (
 )
 from .terminal import (
     Style, clip, fmt_date, fmt_size, plural, print_audit, print_chat,
-    print_memories, print_memory, print_table, resume_cmd,
+    print_memories, print_memory, print_permissions, print_table, resume_cmd,
+    short_home,
 )
+from . import config as cfg
 from . import memory as mem
 from . import webpage
 
@@ -56,6 +58,18 @@ verbs: filter, -s to read, -D to delete):
   claude-logbook -m -s deadlock      same, by name
   claude-logbook -m --check          audit indexes, links and sources
   claude-logbook -m -D 3             delete it and drop it from MEMORY.md
+
+permissions (-P lists them; any change flag implies it). Rules go to the
+user settings unless -p names a project, then to its settings.local.json;
+--scope project writes the shared .claude/settings.json instead:
+  claude-logbook -P                         user rules and every project with rules
+  claude-logbook -P -p logbook              one project, trusted or not
+  claude-logbook --allow "Bash(npm test:*)" -p .
+  claude-logbook --deny "Read(./.env)" --scope project -p .
+  claude-logbook --remove-rule WebFetch     drop it from allow, ask and deny
+  claude-logbook --add-dir ~/shared -p .    extra directory for that project
+  claude-logbook --trust -p ~/repo          accept the trust dialog for it
+  claude-logbook --untrust -p ~/repo --dry-run
 """
 
 
@@ -93,6 +107,28 @@ def build_parser():
     memories_list.add_argument("--check", action="store_true",
                            help="audit indexes, links and source sessions")
 
+    perms = ap.add_argument_group("permissions")
+    perms.add_argument("-P", "--perms", action="store_true",
+                       help="work on permissions instead of sessions")
+    for key, what in (("allow", "allowed without asking"),
+                      ("ask", "always asked"), ("deny", "denied")):
+        perms.add_argument(f"--{key}", metavar="RULE", nargs="+", action="extend",
+                           help=f"add a rule to {key}: {what}")
+    perms.add_argument("--remove-rule", metavar="RULE", nargs="+", action="extend",
+                       help="remove a rule from allow, ask and deny")
+    perms.add_argument("--add-dir", metavar="DIR", nargs="+", action="extend",
+                       help="add to additionalDirectories")
+    perms.add_argument("--remove-dir", metavar="DIR", nargs="+", action="extend",
+                       help="remove from additionalDirectories")
+    trust = perms.add_mutually_exclusive_group()
+    trust.add_argument("--trust", action="store_true",
+                       help="mark the -p project as trusted in ~/.claude.json")
+    trust.add_argument("--untrust", action="store_true",
+                       help="make Claude Code ask again whether to trust it")
+    perms.add_argument("--scope", choices=cfg.SCOPES,
+                       help="settings file to change (default: local with -p, "
+                            "user without)")
+
     output_path = ap.add_argument_group("export")
     output_path.add_argument("--json", action="store_true",
                         help="dump every session as JSON")
@@ -111,7 +147,7 @@ def build_parser():
     delete_items.add_argument("-y", "--yes", action="store_true",
                         help="do not ask before deleting")
     delete_items.add_argument("--dry-run", action="store_true",
-                        help="show what would be deleted and touch nothing")
+                        help="show what would change and touch nothing")
 
     ap.add_argument("--no-cache", action="store_true",
                     help="ignore the cache and re-parse everything")
@@ -403,7 +439,109 @@ def run_memory(sessions, args, st):
     return cmd_mem_table(mem_filtered(memories, args), args, st, len(memories))
 
 
+# ──────────────────────────────── permissions ─────────────────────────────
+
+PERM_EDITS = ("allow", "ask", "deny", "remove_rule", "add_dir", "remove_dir",
+              "trust", "untrust")
+
+
+def wants_perms(args):
+    return args.perms or any(getattr(args, k) for k in PERM_EDITS)
+
+
+def known_projects(sessions):
+    return {s["p"] for s in sessions} | set(cfg.trusted_projects())
+
+
+def cmd_perms_list(sessions, args, st):
+    view = cfg.overview({s["p"] for s in sessions})
+    needles = [n.lower() for n in
+               ([os.path.expanduser(args.project).rstrip("/")] if args.project else [])
+               + list(args.query)]
+    if needles:
+        view["projects"] = [p for p in view["projects"]
+                            if all(n in p["path"].lower() for n in needles)]
+    shown = print_permissions(view, st, sys.stdout, show_all=bool(needles))
+
+    trusted = sum(1 for p in view["projects"] if p["trusted"])
+    if needles and not view["projects"]:
+        print(f"\n{st.faint}no project matches that filter{st.reset}")
+        return 1
+    hidden = len(view["projects"]) - shown
+    tail = f"{trusted} of {plural(len(view['projects']), 'project', 'projects')} trusted"
+    if hidden:
+        tail += f" · {hidden} without rules not shown (-p to see one)"
+    print(f"\n{st.faint}{tail}{st.reset}")
+    return 0
+
+
+def cmd_perms_edit(sessions, args, st):
+    project = None
+    if args.project:
+        project = cfg.resolve_project(args.project, known_projects(sessions))
+    if (args.trust or args.untrust) and not project:
+        raise SessionError("--trust and --untrust need a project: -p PATH (-p . for here)")
+
+    changes = []
+    for key in cfg.LISTS:
+        changes += [("add", key, cfg.check_rule(r)) for r in getattr(args, key) or []]
+    changes += [("forget", r.strip()) for r in args.remove_rule or []]
+    changes += [("add-dir", cfg.normalize_dir(d)) for d in args.add_dir or []]
+    changes += [("remove-dir", cfg.normalize_dir(d)) for d in args.remove_dir or []]
+
+    for d in args.add_dir or []:
+        if not os.path.isdir(cfg.normalize_dir(d)):
+            print(f"{st.copper}warning: {d} is not a directory (added anyway){st.reset}",
+                  file=sys.stderr)
+
+    verb = "would change" if args.dry_run else "changed"
+    touched = False
+
+    if changes:
+        scope = args.scope or ("local" if project else "user")
+        path = cfg.settings_path(scope, project)
+        steps = cfg.edit_settings(path, changes, dry_run=args.dry_run)
+        if steps:
+            touched = True
+            print(f"{st.bold}{scope}{st.reset}  {st.faint}{short_home(path)}{st.reset}")
+            for step in steps:
+                print(f"  {step}")
+        else:
+            print(f"{st.faint}{short_home(path)}: already like that{st.reset}")
+
+    if args.trust or args.untrust:
+        value = bool(args.trust)
+        state = short_home(cfg.global_state_path())
+        if cfg.set_trust(project, value, dry_run=args.dry_run):
+            touched = True
+            word = "trusted" if value else "not trusted"
+            print(f"{st.bold}trust{st.reset}  {st.faint}{state}{st.reset}")
+            print(f"  {short_home(project)} → {word}")
+        else:
+            print(f"{st.faint}{state}: {short_home(project)} already "
+                  f"{'trusted' if value else 'not trusted'}{st.reset}")
+
+    if args.dry_run and touched:
+        print(f"\n{st.faint}--dry-run: nothing was touched.{st.reset}")
+    elif touched:
+        print(f"\n{st.faint}{verb}; Claude Code sessions already open may need "
+              f"a restart to see it.{st.reset}")
+    return 0
+
+
+def run_perms(args, st):
+    root = default_root()
+    sessions = (load_sessions(root=root, use_cache=not args.no_cache)
+                if os.path.isdir(root) else [])
+    if any(getattr(args, k) for k in PERM_EDITS):
+        return cmd_perms_edit(sessions, args, st)
+    return cmd_perms_list(sessions, args, st)
+
+
 def run(args):
+    if wants_perms(args):
+        return run_perms(args, Style.from_stream(sys.stdout, args.no_color))
+
     root = default_root()
     if not os.path.isdir(root):
         print(f"error: {root} does not exist — have you used Claude Code on this machine?",
