@@ -965,7 +965,7 @@ function renderBody(text, wikilinks) {
     ['your messages', msgs, ''],
     ['on disk', mb.toFixed(1), ' MB'],
     ['period', `${pad(f.getDate())} ${MONTHS[f.getMonth()]} – ${pad(l.getDate())} ${MONTHS[l.getMonth()]}`, ''],
-    ['memories', MEM.length, ''],
+    ...(MEM.length ? [['memories', MEM.length, '']] : []),
   ].map(([k, v, s]) => `<div class="stat"><span class="stat-k">${k}</span><span class="stat-v">${v}${s ? `<small>${s}</small>` : ''}</span></div>`).join('');
 })();
 
@@ -989,6 +989,9 @@ function fillProjects() {
 
 $('#nS').textContent = DATA.length;
 $('#nM').textContent = MEM.length;
+// A page without memories (a shared session, or none written yet) has
+// nothing to switch to: no tabs at all.
+if (!MEM.length) document.querySelector('.tabs').style.display = 'none';  // .tabs is flex: [hidden] would lose
 
 /* ---------- list ---------- */
 
