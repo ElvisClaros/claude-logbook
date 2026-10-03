@@ -37,6 +37,8 @@ examples:
   claude-logbook -r 3                command to resume #3
   eval "$(claude-logbook -r 3)"      resume it right away
   claude-logbook --html --open       write sessions.html and open it
+  claude-logbook -s 3 --html         export only #3 (session-<id>.html)
+  claude-logbook -p api --json       export only that project's sessions
 
 the # is the position in the table you are looking at, so if you filtered
 you have to repeat the filter to read that row:
@@ -131,9 +133,11 @@ def build_parser():
 
     output_path = ap.add_argument_group("export")
     output_path.add_argument("--json", action="store_true",
-                        help="dump every session as JSON")
-    output_path.add_argument("--html", nargs="?", const=DEFAULT_HTML, metavar="FILE",
-                        help=f"write a self-contained page (default {DEFAULT_HTML})")
+                        help="dump the sessions as JSON (all, or what -s and "
+                             "the filters select)")
+    output_path.add_argument("--html", nargs="?", const="", metavar="FILE",
+                        help=f"write a self-contained page (default {DEFAULT_HTML}, "
+                             f"or session-<id>.html with -s)")
     output_path.add_argument("--template", metavar="FILE",
                         help="use another template for --html")
     output_path.add_argument("--open", action="store_true",
@@ -266,19 +270,44 @@ def delete_targets(pool, args):
 
 # ──────────────────────────────── commands ────────────────────────────────
 
-def cmd_json(sessions):
+def export_selection(sessions, args):
+    """What --json and --html export: the -s session, or what the filters and
+    -n leave. With no filter at all, everything, memories included; otherwise
+    only the memories of the projects that made it."""
+    if args.show:
+        chosen = [pick(filtered(sessions, args), args.show)]
+    else:
+        chosen = filtered(sessions, args)
+        if args.limit:
+            chosen = chosen[: args.limit]
+
+    memories = mem.load_memories(sessions)
+    if len(chosen) != len(sessions):
+        dirs = {s["project_dir"] for s in chosen}
+        memories = [m for m in memories if m["project_dir"] in dirs]
+    return chosen, memories
+
+
+def cmd_json(sessions, memories):
     import json
     payload = webpage.build_payload(
-        public_records(sessions),
-        mem.public_records(mem.load_memories(sessions)))
+        public_records(sessions), mem.public_records(memories))
     json.dump(payload, sys.stdout, ensure_ascii=False, separators=(",", ":"))
     sys.stdout.write("\n")
     return 0
 
 
-def cmd_html(sessions, args):
-    out = args.html
-    memories = mem.public_records(mem.load_memories(sessions))
+def html_path(chosen, args):
+    if args.html:
+        return args.html
+    if args.show:
+        return f"session-{chosen[0]['id'][:8]}.html"
+    return DEFAULT_HTML
+
+
+def cmd_html(sessions, memories, args):
+    out = html_path(sessions, args)
+    memories = mem.public_records(memories)
     stats = webpage.write(public_records(sessions), out, memories=memories,
                           template=webpage.template_text(args.template))
     print(f"{stats['sessions']} sessions · {stats['projects']} projects · "
@@ -558,10 +587,14 @@ def run(args):
     if args.memory:
         return run_memory(sessions, args, st)
 
-    if args.json:
-        return cmd_json(sessions)
-    if args.html:
-        return cmd_html(sessions, args)
+    if args.json or args.html is not None:
+        chosen, memories = export_selection(sessions, args)
+        if not chosen:
+            print("No session matches that filter.", file=sys.stderr)
+            return 1
+        if args.json:
+            return cmd_json(chosen, memories)
+        return cmd_html(chosen, memories, args)
 
     if args.delete or args.delete_empty:
         targets = delete_targets(filtered(sessions, args), args)

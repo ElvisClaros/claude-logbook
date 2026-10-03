@@ -100,6 +100,57 @@ class TestExport(CliCase):
         self.assertEqual(len(payload["s"]), 3)
         self.assertEqual(payload["m"], [])
 
+    def test_json_of_one_session(self):
+        simple_tree(self.root)
+        code, out, _ = self.run_cli("-s", "cccccccc", "--json")
+        self.assertEqual(code, 0)
+        data = json.loads(out)
+        self.assertEqual([r["id"][:8] for r in data["s"]], ["cccccccc"])
+
+    def test_json_honours_filters_and_limit(self):
+        simple_tree(self.root)
+        _, out, _ = self.run_cli("-p", "/home/u/proj", "--json")
+        self.assertTrue(all(r["p"] == "/home/u/proj" for r in json.loads(out)["s"]))
+        _, out, _ = self.run_cli("-n", "1", "--json")
+        self.assertEqual(len(json.loads(out)["s"]), 1)
+
+    def test_export_with_no_match(self):
+        simple_tree(self.root)
+        code, _, err = self.run_cli("nothing-like-this", "--json")
+        self.assertEqual(code, 1)
+        self.assertIn("No session matches", err)
+
+    def test_html_of_one_session_gets_its_own_name(self):
+        simple_tree(self.root)
+        cwd = os.getcwd()
+        os.chdir(self.home)
+        self.addCleanup(os.chdir, cwd)
+        code, _, err = self.run_cli("-s", "aaaaaaaa", "--html")
+        self.assertEqual(code, 0)
+        self.assertIn("1 sessions", err)
+        with open("session-aaaaaaaa.html", encoding="utf-8") as f:
+            payload = json.loads(PAYLOAD_RE.findall(f.read())[0])
+        self.assertEqual(len(payload["s"]), 1)
+
+    def test_default_html_name_without_show(self):
+        simple_tree(self.root)
+        cwd = os.getcwd()
+        os.chdir(self.home)
+        self.addCleanup(os.chdir, cwd)
+        self.run_cli("--html")
+        self.assertTrue(os.path.exists("sessions.html"))
+
+    def test_memories_follow_the_selection(self):
+        simple_tree(self.root)
+        memory_tree(self.root)
+        _, out, _ = self.run_cli("--json")
+        everything = json.loads(out)["m"]
+        _, out, _ = self.run_cli("-p", "/home/u/proj", "--json")
+        some = json.loads(out)["m"]
+        self.assertTrue(everything)
+        self.assertTrue(all(m["p"] == "/home/u/proj" for m in some))
+        self.assertLess(len(some), len(everything))
+
     def test_html_leaves_stdout_alone(self):
         # The summary goes to stderr so `--html /dev/stdout` keeps working.
         simple_tree(self.root)
@@ -201,7 +252,10 @@ class TestDeletion(CliCase):
 class TestParser(unittest.TestCase):
     def test_html_without_value_uses_the_default_name(self):
         args = cli.build_parser().parse_args(["--html"])
-        self.assertEqual(args.html, cli.DEFAULT_HTML)
+        self.assertEqual(cli.html_path([{"id": "abcdef0123"}], args), cli.DEFAULT_HTML)
+        args = cli.build_parser().parse_args(["--html", "-s", "1"])
+        self.assertEqual(cli.html_path([{"id": "abcdef0123"}], args),
+                         "session-abcdef01.html")
 
     def test_html_with_value(self):
         self.assertEqual(cli.build_parser().parse_args(["--html", "x.html"]).html,

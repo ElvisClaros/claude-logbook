@@ -24,7 +24,9 @@ The command reads local files and never sends anything anywhere.
 `--json` and `--html` write out **the full text of your conversations and your
 projects' memories**: prompts,
 answers, file paths, branch names. The generated `sessions.html` is a complete,
-readable copy of everything you ever typed into Claude Code.
+readable copy of everything you ever typed into Claude Code. Exporting a single
+session (`-s 3 --html`) is still that whole conversation: read it before you
+share it.
 
 Do not commit it, do not upload it, do not paste it into a bug report. The
 repository's `.gitignore` already excludes `sessions.html` and `data.json`, but
@@ -60,6 +62,7 @@ claude-logbook -g "port already"   # search inside the conversations
 claude-logbook -r 3                # print the command that resumes it
 eval "$(claude-logbook -r 3)"      # …or resume it right away
 claude-logbook --html --open       # build sessions.html and open it
+claude-logbook -s 3 --html         # export only #3 → session-<id>.html
 claude-logbook -m                  # your projects' memories
 claude-logbook -P                  # permissions, extra directories and trust
 ```
@@ -85,8 +88,8 @@ claude-logbook docker -s 2         # reads the 2nd of those three
 | `--no-tools` | Hide tool calls when printing a conversation. |
 | `--no-pager` | Do not pipe the conversation through `$PAGER`. |
 | `--no-color` | Plain output (`NO_COLOR` is honoured too). |
-| `--json` | Dump every session as JSON on stdout. |
-| `--html [FILE]` | Build the standalone page (default `sessions.html`). |
+| `--json` | Dump the sessions as JSON on stdout: all of them, or only `-s` / what the filters keep. |
+| `--html [FILE]` | Build the standalone page with the same selection as `--json` (default `sessions.html`, or `session-<id>.html` with `-s`). |
 | `--template FILE` | Use your own template for `--html`. |
 | `--open` | Open whatever `--html` produced in your browser. |
 | `--no-cache` | Ignore the cache and re-parse everything. |

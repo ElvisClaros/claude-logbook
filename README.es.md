@@ -26,6 +26,8 @@ Español · **[English](README.md)** · Sin dependencias, solo biblioteca están
 memorias de tus proyectos**:
 prompts, respuestas, rutas de archivos, nombres de ramas. El `sessions.html` que
 sale es una copia legible de todo lo que escribiste alguna vez en Claude Code.
+Exportar una sola sesión (`-s 3 --html`) sigue siendo esa conversación entera:
+leela antes de compartirla.
 
 No lo commitees, no lo subas, no lo pegues en un issue. El `.gitignore` del repo
 ya excluye `sessions.html` y `data.json`, pero el archivo lo cuidás vos.
@@ -60,6 +62,7 @@ claude-logbook -g "port already"   # busca dentro de las conversaciones
 claude-logbook -r 3                # imprime el comando para reanudarla
 eval "$(claude-logbook -r 3)"      # …o la reanuda directamente
 claude-logbook --html --open       # genera sessions.html y lo abre
+claude-logbook -s 3 --html         # exporta solo la #3 → session-<id>.html
 claude-logbook -m                  # las memorias de tus proyectos
 claude-logbook -P                  # permisos, directorios extra y confianza
 ```
@@ -85,8 +88,8 @@ claude-logbook docker -s 2         # lee el 2º de esos tres
 | `--no-tools` | En el chat, oculta las llamadas a herramientas. |
 | `--no-pager` | No manda el chat a `$PAGER`. |
 | `--no-color` | Salida sin color (también respeta `NO_COLOR`). |
-| `--json` | Vuelca todas las sesiones en JSON por stdout. |
-| `--html [FILE]` | Genera la página autocontenida (por defecto `sessions.html`). |
+| `--json` | Vuelca las sesiones en JSON por stdout: todas, o solo `-s` / lo que dejen los filtros. |
+| `--html [FILE]` | Genera la página autocontenida con la misma selección que `--json` (por defecto `sessions.html`, o `session-<id>.html` con `-s`). |
 | `--template FILE` | Usa tu propio template para `--html`. |
 | `--open` | Abre en el navegador lo que haya generado `--html`. |
 | `--no-cache` | Ignora el caché y re-parsea todo. |
