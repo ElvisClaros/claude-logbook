@@ -29,6 +29,9 @@ sale es una copia legible de todo lo que escribiste alguna vez en Claude Code.
 Exportar una sola sesión (`-s 3 --html`) sigue siendo esa conversación entera:
 leela antes de compartirla.
 
+`--share` sube una conversación a propósito, a un link público: ver
+[Compartir una sesión](#compartir-una-sesión).
+
 No lo commitees, no lo subas, no lo pegues en un issue. El `.gitignore` del repo
 ya excluye `sessions.html` y `data.json`, pero el archivo lo cuidás vos.
 
@@ -102,6 +105,11 @@ claude-logbook docker -s 2         # lee el 2º de esos tres
 | `--add-dir`, `--remove-dir DIR` | Edita `additionalDirectories`. |
 | `--trust`, `--untrust` | Acepta o reinicia el diálogo de confianza del proyecto `-p`. |
 | `--scope SCOPE` | Archivo de settings a cambiar: `user`, `project` o `local`. |
+| `--share` | Con `-s`: publica esa sesión e imprime su link (pregunta antes, salvo `-y`). |
+| `--expire TTL` | Cuánto vive el share: `1d`, `7d`, `30d` (default) o `90d`. |
+| `--shares` | Lista lo que compartió esta máquina. |
+| `--unshare REF` | Borra un share: su id, su URL o el prefijo de UUID de la sesión. |
+| `--server URL` | Servidor de shares (default `$CLAUDE_LOGBOOK_SERVER` o `https://claude-logbook.all.ar`). |
 
 ### Borrar sesiones
 
@@ -207,6 +215,46 @@ Las sesiones ya abiertas pueden necesitar reiniciarse para notarlo.
 `~/.claude.json` también guarda tu cuenta y el estado de cada Claude Code en
 marcha, que lo reescriben seguido: claude-logbook lo lee justo antes de
 cambiarlo y reintenta si se modificó en el medio.
+
+## Compartir una sesión
+
+`--share` publica **una** sesión en <https://claude-logbook.all.ar> e imprime
+su link:
+
+```bash
+claude-logbook -s 3 --share               # muestra qué se sube y pregunta
+claude-logbook -s 3 --share --expire 7d   # desaparece en una semana (default 30 días)
+claude-logbook -s 3 --share               # otra vez más tarde: mismo link, contenido nuevo
+claude-logbook --shares                   # qué compartiste y hasta cuándo
+claude-logbook --unshare 5d10f1ee         # bajarlo (id, URL o sesión)
+```
+
+Cada share tiene tres formas:
+
+| URL | Contenido |
+| --- | --- |
+| `/share/<id>` | La conversación como página, la misma vista que `--html`. |
+| `/share/<id>.txt` | La transcripción en texto plano. |
+| `/share/<id>.json` | Los datos, como los imprime `--json -s`. |
+
+Antes de subir muestra el título, la ruta del proyecto, el tamaño y un aviso
+por cualquier cosa que parezca una API key, un token o una clave privada (dónde
+está, nunca el valor). `--dry-run` se detiene ahí.
+
+Para tener en cuenta:
+
+- **Cualquiera con el link puede leer la conversación entera**, llamadas a
+  herramientas y rutas incluidas. No está cifrada; el servidor también la puede
+  leer.
+- Solo la máquina que creó un share puede actualizarlo o borrarlo: el servidor
+  devuelve un secret que se guarda en
+  `$XDG_STATE_HOME/claude-logbook/shares.json` (`~/.local/state/...`), con modo
+  600. Si perdés ese archivo, el share queda hasta que vence.
+- Las memorias nunca se comparten.
+
+El servidor está en [`server/`](server/README.md): Go, solo biblioteca estándar,
+imagen Docker `FROM scratch`. Podés correr el tuyo y apuntar
+`CLAUDE_LOGBOOK_SERVER` a él.
 
 ## La página HTML
 
@@ -329,7 +377,9 @@ tocan `~/.claude`. No hay nada que instalar: ni runner de tests ni dependencias.
 | `claude_logbook/config.py` | Reglas de permisos, directorios extra y confianza en carpetas. |
 | `claude_logbook/terminal.py` | Colores ANSI, la tabla, imprimir un chat. |
 | `claude_logbook/webpage.py` | Meter los datos adentro del template. |
+| `claude_logbook/share.py` | Hablar con el servidor de shares y el registro local de shares. |
 | `claude_logbook/cli.py` | Los argumentos y los comandos. |
+| `server/` | El servidor de shares (Go): `cd server && go generate && go test ./...`. |
 | `claude_logbook/template.html` | La página: marcado, estilos y el código del navegador. |
 
 ## Licencia

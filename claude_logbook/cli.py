@@ -20,6 +20,7 @@ from .terminal import (
 )
 from . import config as cfg
 from . import memory as mem
+from . import share
 from . import webpage
 
 DEFAULT_HTML = "sessions.html"
@@ -72,6 +73,12 @@ user settings unless -p names a project, then to its settings.local.json;
   claude-logbook --add-dir ~/shared -p .    extra directory for that project
   claude-logbook --trust -p ~/repo          accept the trust dialog for it
   claude-logbook --untrust -p ~/repo --dry-run
+
+sharing (one session, readable by anyone with the link; asks first unless -y):
+  claude-logbook -s 3 --share               upload #3, prints its link
+  claude-logbook -s 3 --share --expire 7d   gone in a week (default 30d)
+  claude-logbook --shares                   what this machine has shared
+  claude-logbook --unshare 5d10f1ee         delete it (share id, URL or session)
 """
 
 
@@ -143,13 +150,26 @@ def build_parser():
     output_path.add_argument("--open", action="store_true",
                         help="open what --html writes in the browser")
 
+    sharing = ap.add_argument_group("share")
+    sharing.add_argument("--share", action="store_true",
+                         help="publish the -s session and print its link")
+    sharing.add_argument("--expire", choices=share.EXPIRES, default=share.DEFAULT_EXPIRE,
+                         help=f"how long the share lives (default {share.DEFAULT_EXPIRE})")
+    sharing.add_argument("--shares", action="store_true",
+                         help="list what this machine has shared")
+    sharing.add_argument("--unshare", metavar="REF",
+                         help="delete a share: its id, its URL or the session UUID prefix")
+    sharing.add_argument("--server", metavar="URL",
+                         help=f"share server (default ${share.SERVER_ENV} or "
+                              f"{share.DEFAULT_SERVER})")
+
     delete_items = ap.add_argument_group("delete")
     delete_items.add_argument("-D", "--delete", metavar="REF", nargs="+",
                         help="delete those sessions (index or UUID prefix)")
     delete_items.add_argument("--delete-empty", action="store_true",
                         help="delete every session with no messages")
     delete_items.add_argument("-y", "--yes", action="store_true",
-                        help="do not ask before deleting")
+                        help="do not ask before deleting or sharing")
     delete_items.add_argument("--dry-run", action="store_true",
                         help="show what would change and touch nothing")
 
@@ -567,7 +587,83 @@ def run_perms(args, st):
     return cmd_perms_list(sessions, args, st)
 
 
+# ──────────────────────────────── sharing ─────────────────────────────────
+
+def cmd_share(sessions, args, st):
+    import json
+    if not args.show:
+        raise SessionError("--share needs a session (-s REF): one at a time")
+    s = pick(filtered(sessions, args), args.show)
+    if s["e"]:
+        raise SessionError("that session has no messages, there is nothing to share")
+    server = share.server_url(args.server)
+    payload = webpage.build_payload(public_records([s]), [])
+    size = len(json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode())
+    old = share.entry_for_session(share.load_registry(), s["id"], server)
+
+    err = sys.stderr
+    print(f"{st.bold}{s['t'] or 'Untitled session'}{st.reset}", file=err)
+    print(f"  {short_home(s['p'])}  ·  {s['u']} yours / {s['a']} from Claude  ·  "
+          f"{len(s['c'])} blocks  ·  {fmt_size(size / 1024)}", file=err)
+    where = f"updates {old['url']}" if old else f"new link on {server}"
+    print(f"  {where}, expires in {args.expire}", file=err)
+    for kind, blocks in share.scan_secrets(payload):
+        places = ["the title" if b == 0 else f"block {b}" for b in blocks[:8]]
+        shown = ", ".join(places) + (" …" if len(blocks) > 8 else "")
+        print(f"  {st.copper}warning:{st.reset} possible {kind} in {shown} "
+              f"(see it with -s {args.show})", file=err)
+    print(f"{st.faint}  Anyone with the link can read the whole conversation, "
+          f"tool calls and paths included.{st.reset}", file=err)
+
+    if args.dry_run:
+        print("--dry-run: nothing was uploaded.", file=err)
+        return 0
+    if not args.yes and not confirm("Upload it? [y/N] "):
+        print("Nothing was uploaded.", file=err)
+        return 1
+
+    entry, created = share.publish(server, payload, args.expire, s["id"], s["t"])
+    print(f"{'Shared' if created else 'Updated'} · expires {fmt_expiry(entry)}", file=err)
+    print(entry["url"])
+    print(f"{st.faint}  {entry['url']}.txt  ·  {entry['url']}.json{st.reset}", file=err)
+    return 0
+
+
+def fmt_expiry(entry):
+    exp = entry.get("expires") or "?"
+    return exp[:16].replace("T", " ") + " UTC" if len(exp) >= 16 else exp
+
+
+def run_shares(args, st):
+    entries = share.load_registry()
+    if args.unshare:
+        entry = share.find_entry(entries, args.unshare)
+        if args.dry_run:
+            print(f"--dry-run: would delete {entry['url']}", file=sys.stderr)
+            return 0
+        if share.unpublish(entry):
+            print(f"Deleted {entry['url']}")
+        else:
+            print(f"{entry['url']} was already gone; forgotten here too.")
+        return 0
+
+    if not entries:
+        print("Nothing shared from this machine yet.", file=sys.stderr)
+        return 0
+    for e in sorted(entries, key=lambda e: e.get("expires") or ""):
+        state = (f"{st.copper}expired{st.reset}" if share.is_expired(e)
+                 else f"{st.faint}until {fmt_expiry(e)}{st.reset}")
+        print(f"{st.bold}{clip(e.get('title') or 'Untitled session', 60)}{st.reset}  {state}")
+        print(f"  {e['url']}  {st.faint}session {(e.get('session') or '?')[:8]}{st.reset}")
+    print(f"\n{plural(len(entries), 'share', 'shares')} · "
+          f"secrets in {short_home(share.registry_path())}")
+    return 0
+
+
 def run(args):
+    if args.shares or args.unshare:
+        return run_shares(args, Style.from_stream(sys.stdout, args.no_color))
+
     if wants_perms(args):
         return run_perms(args, Style.from_stream(sys.stdout, args.no_color))
 
@@ -586,6 +682,9 @@ def run(args):
 
     if args.memory:
         return run_memory(sessions, args, st)
+
+    if args.share:
+        return cmd_share(sessions, args, st)
 
     if args.json or args.html is not None:
         chosen, memories = export_selection(sessions, args)

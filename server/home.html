@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>claude-logbook</title>
+<meta name="description" content="Browse, export and share your Claude Code sessions from the terminal.">
+<style>
+  :root {
+    --bg: #faf8f4; --fg: #22201c; --muted: #6b665c; --line: #e4dfd5;
+    --code-bg: #f0ece4; --accent: #b4532a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1a1917; --fg: #ece8e1; --muted: #a29c90; --line: #34312c;
+      --code-bg: #262420; --accent: #e08a5c;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font: 16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  main { max-width: 760px; margin: 0 auto; padding: 48px 16px 64px; }
+  h1 { font-size: 2rem; margin: 0 0 4px; letter-spacing: -0.02em; }
+  h1 span { color: var(--accent); }
+  h2 { font-size: 1.15rem; margin: 40px 0 8px; }
+  p.lead { color: var(--muted); margin: 0 0 24px; font-size: 1.1rem; }
+  pre, code { font: 14px/1.5 ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+  code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; }
+  pre {
+    background: var(--code-bg); padding: 14px 16px; border-radius: 8px;
+    overflow-x: auto; margin: 8px 0 16px;
+  }
+  pre code { background: none; padding: 0; }
+  .c { color: var(--muted); }
+  table { border-collapse: collapse; width: 100%; margin: 8px 0 16px; font-size: 15px; }
+  td { border-top: 1px solid var(--line); padding: 8px 8px 8px 0; vertical-align: top; }
+  td:first-child { white-space: nowrap; }
+  .note {
+    border-left: 3px solid var(--accent); padding: 4px 0 4px 14px; margin: 16px 0;
+  }
+  footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--line);
+           color: var(--muted); font-size: 14px; }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+<main>
+  <h1>claude<span>-</span>logbook</h1>
+  <p class="lead">Browse, export and share your Claude Code sessions from the terminal.</p>
+
+  <h2>Install</h2>
+<pre><code>pipx install claude-logbook      <span class="c"># or: pip install --user claude-logbook</span>
+claude-logbook                   <span class="c"># table of every session</span></code></pre>
+
+  <h2>Share a session</h2>
+  <p>Pick a session by its number in the table or by a prefix of its UUID, then share it:</p>
+<pre><code>claude-logbook -s 3 --share                <span class="c"># asks before uploading</span>
+claude-logbook -s 5d10f1ee --share --expire 7d
+claude-logbook --shares                    <span class="c"># what you have shared</span>
+claude-logbook --unshare 5d10f1ee          <span class="c"># take it down</span></code></pre>
+  <p>Sharing the same session again updates it in place: the link stays the same.</p>
+
+  <h2>Links</h2>
+  <table>
+    <tr><td><code>{{PUBLIC_URL}}/share/&lt;id&gt;</code></td><td>the conversation as a page</td></tr>
+    <tr><td><code>{{PUBLIC_URL}}/share/&lt;id&gt;.txt</code></td><td>plain text transcript</td></tr>
+    <tr><td><code>{{PUBLIC_URL}}/share/&lt;id&gt;.json</code></td><td>the raw data, as <code>claude-logbook --json -s</code> prints it</td></tr>
+  </table>
+
+  <h2>Before you share</h2>
+  <div class="note">
+    <p>A share holds the <strong>whole conversation</strong>: your prompts, Claude's answers,
+    the tool calls and the project path. Anyone with the link can read it. It is not
+    encrypted, and this server can read it too.</p>
+  </div>
+  <ul>
+    <li><code>--share</code> warns if it spots things that look like API keys, tokens or private keys.</li>
+    <li>Shares expire after 30 days unless you pick <code>--expire 1d</code>, <code>7d</code> or <code>90d</code>.</li>
+    <li>Only the machine that created a share holds its secret and can update or delete it
+        (<code>~/.local/state/claude-logbook/shares.json</code>).</li>
+    <li>Share pages are marked <code>noindex</code>, but a link is only as private as the places you paste it.</li>
+  </ul>
+
+  <h2>API</h2>
+  <p>The CLI talks to a small JSON API; you can use it directly:</p>
+<pre><code>POST   /api/shares          {"payload": {...}, "expire": "30d"}  → {id, url, secret, expires}
+PUT    /api/shares/&lt;id&gt;     Authorization: Bearer &lt;secret&gt;        replace the content
+DELETE /api/shares/&lt;id&gt;     Authorization: Bearer &lt;secret&gt;        delete it</code></pre>
+  <p>The payload is the JSON of <code>claude-logbook --json -s REF</code>, one session.
+  The server builds the page itself and does not accept HTML.</p>
+
+  <footer>
+    claude-logbook · <a href="https://github.com/ElvisClaros/claude-logbook">source on GitHub</a> ·
+    <a href="https://pypi.org/project/claude-logbook/">PyPI</a>
+  </footer>
+</main>
+</body>
+</html>

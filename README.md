@@ -28,6 +28,9 @@ readable copy of everything you ever typed into Claude Code. Exporting a single
 session (`-s 3 --html`) is still that whole conversation: read it before you
 share it.
 
+`--share` uploads one conversation on purpose, to a public link: see
+[Sharing a session](#sharing-a-session).
+
 Do not commit it, do not upload it, do not paste it into a bug report. The
 repository's `.gitignore` already excludes `sessions.html` and `data.json`, but
 the file itself is yours to look after.
@@ -102,6 +105,11 @@ claude-logbook docker -s 2         # reads the 2nd of those three
 | `--add-dir`, `--remove-dir DIR` | Edit `additionalDirectories`. |
 | `--trust`, `--untrust` | Accept or reset the trust dialog of the `-p` project. |
 | `--scope SCOPE` | Settings file to change: `user`, `project` or `local`. |
+| `--share` | With `-s`: publish that session and print its link (asks first unless `-y`). |
+| `--expire TTL` | How long the share lives: `1d`, `7d`, `30d` (default) or `90d`. |
+| `--shares` | List what this machine has shared. |
+| `--unshare REF` | Delete a share: its id, its URL or the session UUID prefix. |
+| `--server URL` | Share server (default `$CLAUDE_LOGBOOK_SERVER` or `https://claude-logbook.all.ar`). |
 
 ### Deleting sessions
 
@@ -206,6 +214,45 @@ notice.
 `~/.claude.json` also holds your account and the state of every running Claude
 Code, which rewrite it often: claude-logbook reads it right before changing it,
 and retries if it moves in between.
+
+## Sharing a session
+
+`--share` publishes **one** session on <https://claude-logbook.all.ar> and
+prints its link:
+
+```bash
+claude-logbook -s 3 --share               # shows what goes up and asks
+claude-logbook -s 3 --share --expire 7d   # gone in a week (default 30 days)
+claude-logbook -s 3 --share               # again later: same link, new content
+claude-logbook --shares                   # what you have shared, and until when
+claude-logbook --unshare 5d10f1ee         # take it down (id, URL or session)
+```
+
+Each share has three forms:
+
+| URL | Content |
+| --- | --- |
+| `/share/<id>` | The conversation as a page, the same view as `--html`. |
+| `/share/<id>.txt` | Plain text transcript. |
+| `/share/<id>.json` | The data, as `--json -s` prints it. |
+
+Before uploading it shows the title, the project path, the size and a warning
+for anything that looks like an API key, a token or a private key (where it
+is, never the value). `--dry-run` stops there.
+
+What to keep in mind:
+
+- **Anyone with the link can read the whole conversation**, tool calls and
+  paths included. It is not encrypted; the server can read it too.
+- Only the machine that created a share can update or delete it: the server
+  returns a secret that is kept in
+  `$XDG_STATE_HOME/claude-logbook/shares.json` (`~/.local/state/...`), mode
+  600. Lose that file and the share stays until it expires.
+- Memories are never shared.
+
+The server lives in [`server/`](server/README.md): Go, standard library only,
+a `FROM scratch` Docker image. You can run your own and point
+`CLAUDE_LOGBOOK_SERVER` at it.
 
 ## The HTML page
 
@@ -328,7 +375,9 @@ The tests build fake `.jsonl` trees in a temporary directory and never touch
 | `claude_logbook/config.py` | Permission rules, extra directories and folder trust. |
 | `claude_logbook/terminal.py` | ANSI colours, the table, printing a conversation. |
 | `claude_logbook/webpage.py` | Embedding the data into the template. |
+| `claude_logbook/share.py` | Talking to the share server and the local registry of shares. |
 | `claude_logbook/cli.py` | Argument parsing and the commands. |
+| `server/` | The share server (Go): `cd server && go generate && go test ./...`. |
 | `claude_logbook/template.html` | The page: markup, styles and the browser-side code. |
 
 ## License

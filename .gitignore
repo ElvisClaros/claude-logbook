@@ -5,6 +5,7 @@ sesiones.html
 data.json
 *.html
 !claude_logbook/template.html
+!server/home.html
 
 # Python
 __pycache__/

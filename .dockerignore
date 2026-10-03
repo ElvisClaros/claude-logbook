@@ -1,0 +1,4 @@
+*
+!server/
+!claude_logbook/template.html
+server/template.html

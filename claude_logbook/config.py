@@ -82,9 +82,11 @@ def read_json(path):
     return data
 
 
-def write_json(path, data):
+def write_json(path, data, mode=None):
     """Atomic replace that keeps the file's mode (0644 minus umask if new) and
-    whether it ended in a newline, so an untouched key reads exactly the same."""
+    whether it ended in a newline, so an untouched key reads exactly the same.
+    An explicit `mode` wins over both, for files that hold secrets."""
+    forced = mode
     try:
         mode = os.stat(path).st_mode & 0o777
         with open(path, "rb") as fh:
@@ -107,7 +109,7 @@ def write_json(path, data):
             json.dump(data, fh, indent=2, ensure_ascii=False)
             if newline:
                 fh.write("\n")
-        os.chmod(tmp, mode)
+        os.chmod(tmp, forced if forced is not None else mode)
         os.replace(tmp, path)
     except BaseException:
         try:
