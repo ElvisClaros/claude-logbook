@@ -272,6 +272,10 @@ works.
 - Keyboard: `/` or `Ctrl`+`K` focuses the search box, `Esc` clears it or closes
   the reader.
 
+A page with a single session (`-s 3 --html`, or any shared link) skips the
+list and is just that conversation: title, details and the transcript. A
+single session is exported without memories.
+
 Dates are relative to **when the data was read**, not to your clock, so "today"
 keeps meaning what it meant when you generated the page.
 

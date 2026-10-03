@@ -78,6 +78,27 @@
   }
   body.locked { overflow: hidden; }
 
+  /* ---------- single session ----------
+     A page with one session and no memories (a shared link, or -s --html)
+     is that conversation: the reader becomes the page, no list around it. */
+  body.single .wrap, body.single .scrim, body.single #rClose { display: none; }
+  body.single.locked { overflow: auto; }
+  body.single .reader {
+    position: static;
+    transform: none;
+    visibility: visible;
+    transition: none;
+    width: min(920px, 100%);
+    height: auto;
+    min-height: 100vh;
+    margin: 0 auto;
+    box-shadow: none;
+    border-left: 0;
+  }
+  body.single .reader-head { border: 1px solid var(--line); border-top: 0; border-radius: 0 0 10px 10px; }
+  body.single .reader-head h2 { font-size: 22px; }
+  body.single .transcript { overflow: visible; padding: 28px 20px 96px; }
+
   .wrap { max-width: 1180px; margin: 0 auto; padding: 40px 24px 96px; }
 
   /* ---------- masthead ---------- */
@@ -854,6 +875,7 @@
 const PAYLOAD = JSON.parse(document.getElementById('payload').textContent);
 const DATA = PAYLOAD.s || [];
 const MEM = PAYLOAD.m || [];
+const SINGLE = DATA.length === 1 && !MEM.length;
 // Snapshot = the most recent activity in the data, so that "today" stays true
 // relative to when the logs were read and not to the viewer's clock.
 const NOW = new Date(Math.max(
@@ -1168,12 +1190,12 @@ function showReader() {
   scrimEl.classList.add('open');
   readerEl.classList.add('open');
   document.body.classList.add('locked');
-  readerEl.focus();
+  if (!SINGLE) readerEl.focus();
 }
 
 function openChat(id) {
   const d = BY_ID.get(id);
-  if (!d || d.e) return;
+  if (!d || (d.e && !SINGLE)) return;
   open_ = { kind: 's', key: id };
   lastFocus = document.activeElement;
   $('#rCopy').hidden = false;
@@ -1184,8 +1206,9 @@ function openChat(id) {
     `<span>${fmtDate(d.l)} · ${fmtTime(d.l)}</span>`,
     `<span>${d.u} yours / ${d.a} from Claude</span>`,
     `<span>${fmtDur(d.d)}</span>`,
+    d.v ? `<span>Claude Code ${esc(d.v)}</span>` : '',
     `<span class="chip">${d.id.slice(0, 8)}</span>`,
-  ].join('');
+  ].filter(Boolean).join('');
 
   bodyEl.innerHTML = d.c.length
     ? d.c.map(m => m.r === 't'
@@ -1196,7 +1219,7 @@ function openChat(id) {
       ).join('')
     : `<p class="reader-empty">This session has no messages.</p>`;
 
-  if (location.hash.slice(1) !== id) history.replaceState(null, '', '#' + id);
+  if (!SINGLE && location.hash.slice(1) !== id) history.replaceState(null, '', '#' + id);
   showReader();
 }
 
@@ -1243,7 +1266,7 @@ function openMemory(name) {
 }
 
 function closeReader() {
-  if (!open_) return;
+  if (!open_ || SINGLE) return;
   open_ = null;
   if (location.hash) history.replaceState(null, '', location.pathname + location.search);
   scrimEl.classList.remove('open');
@@ -1265,7 +1288,7 @@ function openFromHash() {
 
 // The dialog is aria-modal: focus must stay inside while it is open.
 readerEl.addEventListener('keydown', e => {
-  if (e.key !== 'Tab') return;
+  if (e.key !== 'Tab' || SINGLE) return;
   const f = [...readerEl.querySelectorAll('button, [tabindex]:not([tabindex="-1"])')]
     .filter(el => el.offsetParent !== null);
   if (!f.length) return;
@@ -1410,7 +1433,16 @@ $('#snap').textContent = `Snapshot read on ${pad(NOW.getDate())} ${MONTHS[NOW.ge
 document.body.dataset.mode = mode;
 fillProjects();
 render();
-openFromHash();
+if (SINGLE) {
+  document.body.classList.add('single');
+  readerEl.setAttribute('role', 'main');
+  readerEl.removeAttribute('aria-modal');
+  $('.rh-acts').prepend($('#theme'));
+  document.title = (DATA[0].t || 'Untitled session') + ' · Claude Code session';
+  openChat(DATA[0].id);
+} else {
+  openFromHash();
+}
 </script>
 </body>
 </html>

@@ -151,6 +151,14 @@ class TestExport(CliCase):
         self.assertTrue(all(m["p"] == "/home/u/proj" for m in some))
         self.assertLess(len(some), len(everything))
 
+    def test_a_single_session_goes_without_memories(self):
+        simple_tree(self.root)
+        memory_tree(self.root)
+        _, out, _ = self.run_cli("-s", "aaaaaaaa", "--json")
+        data = json.loads(out)
+        self.assertEqual(len(data["s"]), 1)
+        self.assertEqual(data["m"], [])
+
     def test_html_leaves_stdout_alone(self):
         # The summary goes to stderr so `--html /dev/stdout` keeps working.
         simple_tree(self.root)

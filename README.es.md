@@ -272,6 +272,10 @@ servidor, sin red, sin paso de build: lo copiás a otra máquina y sigue andando
   esa conversación directamente.
 - Teclado: `/` o `Ctrl`+`K` enfoca el buscador, `Esc` lo limpia o cierra el lector.
 
+Una página con una sola sesión (`-s 3 --html`, o cualquier link compartido) no
+muestra la lista: es directamente esa conversación, con título, datos y la
+transcripción. Una sola sesión se exporta sin memorias.
+
 Las fechas son relativas a **cuándo se leyeron los datos**, no a tu reloj, así
 que "hoy" sigue queriendo decir lo que quería decir cuando generaste la página.
 

@@ -293,9 +293,10 @@ def delete_targets(pool, args):
 def export_selection(sessions, args):
     """What --json and --html export: the -s session, or what the filters and
     -n leave. With no filter at all, everything, memories included; otherwise
-    only the memories of the projects that made it."""
+    only the memories of the projects that made it. A single session (-s) goes
+    alone, as it would be shared: no memories."""
     if args.show:
-        chosen = [pick(filtered(sessions, args), args.show)]
+        return [pick(filtered(sessions, args), args.show)], []
     else:
         chosen = filtered(sessions, args)
         if args.limit:
