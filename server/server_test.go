@@ -117,6 +117,16 @@ func TestCreateAndRead(t *testing.T) {
 	}
 }
 
+func TestCompactionBlock(t *testing.T) {
+	h := newHarness(t, nil)
+	withC := strings.Replace(session, `"c":[`, `"c":[{"r":"c","x":"earlier summary"},`, 1)
+	r := h.create(`{"payload":` + payload(withC) + `}`)
+	txt := h.do("GET", "/share/"+r.ID+".txt", "", "").Body.String()
+	if !strings.Contains(txt, "--- context compacted here ---") || strings.Contains(txt, "earlier summary") {
+		t.Fatalf("txt: %s", txt)
+	}
+}
+
 func TestUpdateAndDeleteNeedTheSecret(t *testing.T) {
 	h := newHarness(t, nil)
 	r := h.create(`{"payload":` + payload() + `}`)

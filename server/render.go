@@ -81,7 +81,7 @@ func ParsePayload(raw []byte, maxSessions int) (*Payload, []byte, error) {
 			return nil, nil, fmt.Errorf("payload: session %d: no c", i)
 		}
 		for j, b := range s.C {
-			if b.R != "u" && b.R != "a" && b.R != "t" {
+			if b.R != "u" && b.R != "a" && b.R != "t" && b.R != "c" {
 				return nil, nil, fmt.Errorf("payload: session %d block %d: bad r", i, j)
 			}
 		}
@@ -187,6 +187,8 @@ func RenderText(p *Payload) []byte {
 		prev := ""
 		for _, c := range s.C {
 			switch c.R {
+			case "c":
+				b.WriteString("\n--- context compacted here ---\n")
 			case "t":
 				if prev != "t" {
 					b.WriteString("\n")

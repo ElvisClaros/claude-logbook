@@ -19,7 +19,8 @@ Schema of the record returned by `read_session`:
     u/a  number of messages from you / from Claude
     k    size of the .jsonl in KB
     v    Claude Code version
-    c    transcript: [{"r": "u" | "a" | "t", "x": text}]
+    c    transcript: [{"r": "u" | "a" | "t" | "c", "x": text}]
+         (t: tool call summary, c: compaction summary)
 
 `project_dir` and `mtime` are internal and never leave the module:
 `public_records()` drops them before the record is serialized.
@@ -33,7 +34,7 @@ from datetime import datetime, timezone
 
 # Bump it when the record schema changes: it invalidates old caches instead of
 # reading records with the previous shape.
-CACHE_VERSION = 2
+CACHE_VERSION = 3
 
 EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
 
@@ -83,6 +84,10 @@ TOOL_ARG_MAX = 140
 # Threshold of the `claude -p` heuristic: a single message longer than this, with
 # no back and forth, is a pipe on stdin and not a conversation.
 NONINTERACTIVE_CHARS = 1500
+
+# Active time: a pause between two messages longer than this is the session
+# left open, not work, and does not count towards its duration.
+IDLE_GAP_MINUTES = 30
 
 # For each tool, the parameter that best summarizes what it did.
 TOOL_KEY = {
@@ -140,11 +145,26 @@ def parse_ts(ts):
         return None
 
 
+def active_minutes(stamps):
+    """Minutes of work: the gaps between consecutive messages, leaving out
+    the pauses longer than IDLE_GAP_MINUTES. None without messages."""
+    times = sorted(t for t in map(parse_ts, stamps) if t)
+    if not times:
+        return None
+    total = 0.0
+    for a, b in zip(times, times[1:]):
+        gap = (b - a).total_seconds() / 60
+        if gap <= IDLE_GAP_MINUTES:
+            total += gap
+    return round(total)
+
+
 def read_session(path):
     """Parses a whole .jsonl and returns that session's record."""
     session_id = os.path.basename(path)[:-6]  # without .jsonl
     first_ts = last_ts = cwd = git_branch = version = None
-    ai_title = fallback_title = None
+    ai_title = custom_title = fallback_title = None
+    stamps = []  # of the messages, for the active time
     user_msgs = assistant_msgs = 0
     convo = []
 
@@ -166,6 +186,10 @@ def read_session(path):
                 if obj.get("aiTitle"):
                     ai_title = obj["aiTitle"]  # keep the most recent one
                 continue
+            if kind == "custom-title":
+                if obj.get("customTitle"):
+                    custom_title = obj["customTitle"]  # /rename, wins over the AI one
+                continue
 
             ts = obj.get("timestamp")
             if ts:
@@ -185,9 +209,19 @@ def read_session(path):
             message = obj.get("message")
             if not isinstance(message, dict):
                 continue
+            if ts:
+                stamps.append(ts)
 
             if kind == "user":
                 if obj.get("isMeta"):
+                    continue
+                # What /compact (or running out of context) left in place of
+                # the earlier conversation: written by Claude, not by you.
+                if obj.get("isCompactSummary"):
+                    text = "\n".join(
+                        (b.get("text") or "").strip() for b in blocks_of(message)
+                        if isinstance(b, dict) and b.get("type") == "text").strip()
+                    convo.append({"r": "c", "x": text})
                     continue
                 for b in blocks_of(message):
                     if not isinstance(b, dict):
@@ -217,13 +251,11 @@ def read_session(path):
                     assistant_msgs += 1
 
     st = os.stat(path)
-    ft, lt = parse_ts(first_ts), parse_ts(last_ts)
-
     # A single huge message and no back and forth is the signature of a
     # `claude -p` with something piped on stdin (e.g. a git diff to write the
     # commit message), not of a conversation.
     noninteractive = (
-        user_msgs == 1 and not ai_title and bool(convo)
+        user_msgs == 1 and not (ai_title or custom_title) and bool(convo)
         and len(convo[0]["x"]) > NONINTERACTIVE_CHARS
     )
 
@@ -232,13 +264,13 @@ def read_session(path):
         "project_dir": os.path.basename(os.path.dirname(path)),
         "p": cwd,
         "b": git_branch,
-        "t": ai_title or fallback_title,
-        "ai": bool(ai_title),
+        "t": custom_title or ai_title or fallback_title,
+        "ai": bool(custom_title or ai_title),
         "n": noninteractive,
         "e": not convo,
         "f": first_ts,
         "l": last_ts,
-        "d": round((lt - ft).total_seconds() / 60) if ft and lt else None,
+        "d": active_minutes(stamps),
         "u": user_msgs,
         "a": assistant_msgs,
         "k": round(st.st_size / 1024, 1),

@@ -127,6 +127,14 @@ class TestOutput(unittest.TestCase):
         T.print_chat(self.session_item(), T.Style(False), buf, show_tools=False)
         self.assertNotIn("Bash: ls", buf.getvalue())
 
+    def test_compaction_is_a_mark_without_the_summary(self):
+        buf = io.StringIO()
+        c = [{"r": "c", "x": "SUMMARY TEXT"}, {"r": "u", "x": "hello"}]
+        T.print_chat(self.session_item(c=c), T.Style(False), buf)
+        out = buf.getvalue()
+        self.assertIn("context compacted here", out)
+        self.assertNotIn("SUMMARY TEXT", out)
+
     def test_empty_session_says_so(self):
         buf = io.StringIO()
         T.print_chat(self.session_item(c=[], t=None), T.Style(False), buf)

@@ -97,6 +97,51 @@ class TestReadSession(TempRoot):
         self.assertFalse(S.read_session(path)["n"])
 
 
+class TestTitlesCompactionDuration(TempRoot):
+    def test_rename_beats_the_claude_title(self):
+        path = write_session(self.root, "-p", "22222222-0000-0000-0000-000000000001", [
+            ai_title("What Claude thinks"),
+            user("hi there", at=ts(0)),
+            {"type": "custom-title", "customTitle": "Old name"},
+            {"type": "custom-title", "customTitle": "Lo grave"},
+            ai_title("A later Claude title"),
+        ])
+        rec = S.read_session(path)
+        self.assertEqual(rec["t"], "Lo grave")
+        self.assertTrue(rec["ai"])
+
+    def test_compact_summary_is_not_a_message_of_yours(self):
+        path = write_session(self.root, "-p", "22222222-0000-0000-0000-000000000002", [
+            {"type": "system", "subtype": "compact_boundary", "timestamp": ts(0)},
+            user("This session is being continued from a previous conversation. "
+                 "Summary: we fixed the build.", at=ts(0), isCompactSummary=True,
+                 isVisibleInTranscriptOnly=True),
+            user("now the tests", at=ts(2)),
+            assistant("On it.", at=ts(3)),
+        ])
+        rec = S.read_session(path)
+        self.assertEqual([m["r"] for m in rec["c"]], ["c", "u", "a"])
+        self.assertIn("we fixed the build", rec["c"][0]["x"])
+        self.assertEqual(rec["u"], 1)
+        self.assertEqual(rec["t"], "now the tests")
+        self.assertFalse(rec["n"])
+
+    def test_duration_leaves_out_long_pauses(self):
+        path = write_session(self.root, "-p", "22222222-0000-0000-0000-000000000003", [
+            user("start", at=ts(0)),
+            assistant("ok", at=ts(10)),
+            user("next day", at=ts(0, day=15)),
+            assistant("ok", at=ts(20, day=15)),
+            {"type": "system", "timestamp": ts(0, day=20)},  # not a message
+        ])
+        self.assertEqual(S.read_session(path)["d"], 30)
+
+    def test_active_minutes(self):
+        self.assertIsNone(S.active_minutes([]))
+        self.assertEqual(S.active_minutes([ts(0)]), 0)
+        self.assertEqual(S.active_minutes([ts(0), ts(30), ts(31, hour=11)]), 30)
+
+
 class TestToolSummary(unittest.TestCase):
     def test_uses_the_representative_parameter(self):
         self.assertEqual(

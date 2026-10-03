@@ -293,9 +293,16 @@ del sentido.
 
 Algunos detalles que conviene saber:
 
-- **Títulos.** Claude genera uno durante la sesión (eventos `ai-title`); gana el
-  más reciente. Cuando falta, se usa lo primero que escribiste vos — y ahí se
-  nota, porque arranca en minúscula o suena a pregunta suelta.
+- **Títulos.** Gana el que pusiste con `/rename` (eventos `custom-title`); si
+  no, el que genera Claude durante la sesión (`ai-title`), el más reciente de
+  cada uno. Cuando faltan los dos, se usa lo primero que escribiste vos — y ahí
+  se nota, porque arranca en minúscula o suena a pregunta suelta.
+- **Compactación.** Cuando se acaba el contexto (o con `/compact`) Claude Code
+  reemplaza la conversación anterior por un resumen. Ese resumen se muestra como
+  una marca "context compacted here", no como un mensaje tuyo, y no se cuenta.
+- **Duración** es tiempo activo: los intervalos entre mensajes, sin las pausas
+  de más de 30 minutos. Una sesión retomada a lo largo de varios días no cuenta
+  los días del medio.
 - **Sesiones vacías** son las que se abrieron pero nunca recibieron un mensaje:
   un `/resume` cancelado, un `/login`.
 - **No interactivas** son `claude -p` con algo piped por stdin — típicamente un
@@ -332,16 +339,16 @@ Cada sesión de `s`:
 | `p` | Ruta del proyecto (`cwd`). |
 | `b` | Rama de git. |
 | `t` | Título. |
-| `ai` | `true` si el título lo generó Claude. |
+| `ai` | `true` si el título lo pusiste con `/rename` o lo generó Claude. |
 | `n` | `true` si parece un `claude -p` no interactivo. |
 | `e` | `true` si la sesión no tiene mensajes. |
 | `i` | `true` si `p` se dedujo de otra sesión del mismo proyecto. |
 | `f` / `l` | Timestamp del primer y del último evento (ISO 8601). |
-| `d` | Duración en minutos. |
+| `d` | Minutos activos (sin las pausas de más de 30 minutos). |
 | `u` / `a` | Cantidad de mensajes tuyos / de Claude. |
 | `k` | Tamaño del archivo en KB. |
 | `v` | Versión de Claude Code. |
-| `c` | Transcripción: `[{"r": "u"｜"a"｜"t", "x": texto}]`. |
+| `c` | Transcripción: `[{"r": "u"｜"a"｜"t"｜"c", "x": texto}]`; `t` es una llamada a herramienta, `c` un resumen de compactación. |
 
 Cada memoria de `m`:
 

@@ -214,6 +214,16 @@ def print_chat(s, st, out, show_tools=True, width=None):
 
     first = True
     for m in s["c"]:
+        if m["r"] == "c":
+            # The summary is long and Claude's, not part of the dialogue:
+            # only the mark of where the earlier context was folded.
+            if not first:
+                print(file=out)
+            first = False
+            label = " context compacted here "
+            side = max(3, (min(width, 80) - len(label)) // 2)
+            print(f"{st.faint}{'─' * side}{label}{'─' * side}{st.reset}", file=out)
+            continue
         if m["r"] == "t":
             if show_tools:
                 print(f"  {st.faint}⚒ {clip(m['x'], body - 4)}{st.reset}", file=out)
