@@ -147,6 +147,18 @@ class TestOutput(unittest.TestCase):
         self.assertIn("→ /home/u/proj/sub", out)
         self.assertIn("new one", out)
 
+    def test_images_are_a_mark(self):
+        c = [{"r": "u", "x": "look"}, {"r": "i", "x": "[image]", "src": "data:x"},
+             {"r": "v", "x": "[image]"}]
+        buf = io.StringIO()
+        T.print_chat(self.session_item(c=c), T.Style(False), buf)
+        self.assertIn("▣ image attached", buf.getvalue())
+        self.assertIn("▣ image from the tool", buf.getvalue())
+        self.assertNotIn("data:x", buf.getvalue())
+        buf = io.StringIO()
+        T.print_chat(self.session_item(c=c), T.Style(False), buf, show_tools=False)
+        self.assertNotIn("from the tool", buf.getvalue())
+
     def test_empty_session_says_so(self):
         buf = io.StringIO()
         T.print_chat(self.session_item(c=[], t=None), T.Style(False), buf)

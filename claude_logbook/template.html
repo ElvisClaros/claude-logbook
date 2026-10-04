@@ -561,6 +561,25 @@
     border-bottom: 1px dashed var(--line);
   }
 
+  .shot { margin: 8px 0 8px 12px; }
+  .shot.mine { margin-left: 0; }
+  .shot.mine img { border-color: var(--amber-lo); }
+  .shot img {
+    display: block;
+    max-width: min(100%, 360px);
+    max-height: 260px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    cursor: zoom-in;
+  }
+  .shot.zoom img { max-width: 100%; max-height: none; cursor: zoom-out; }
+  .shot-missing {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--muted);
+    padding: 3px 0 3px 12px;
+  }
+
   .cwd {
     font-family: var(--mono);
     font-size: 11.5px;
@@ -1216,11 +1235,24 @@ function showReader() {
   if (!SINGLE) readerEl.focus();
 }
 
+// Only a data: URL of a raster image ever reaches an <img>: the server checks
+// it, and this checks it again for pages written by hand.
+const IMG_RE = /^data:image\/(png|jpeg|gif|webp);base64,[A-Za-z0-9+/=\s]+$/;
+
+function imageHtml(m) {
+  const what = m.r === 'i' ? 'image attached' : 'image from the tool';
+  if (!m.src || !IMG_RE.test(m.src))
+    return `<div class="shot-missing">▣ ${what}${m.src ? '' : ' (not included)'}</div>`;
+  return `<div class="shot${m.r === 'i' ? ' mine' : ''}"><img src="${m.src}" alt="${what}" title="${what}" loading="lazy"></div>`;
+}
+
 function blockHtml(m) {
   return m.r === 't'
     ? `<div class="tool"><b>⚒</b><span>${esc(m.x)}</span></div>`
     : m.r === 'd'
     ? `<div class="cwd">→ ${esc(m.x)}</div>`
+    : m.r === 'i' || m.r === 'v'
+    ? imageHtml(m)
     : m.r === 'c'
     ? `<details class="compact"><summary>Context compacted here · the summary Claude kept</summary><div class="bubble">${renderBody(m.x)}</div></details>`
     : `<div class="turn turn-${m.r}"><span class="who">${WHO[m.r]}</span><div class="bubble">${renderBody(m.x)}</div></div>`;
@@ -1392,6 +1424,8 @@ rowsEl.addEventListener('keydown', e => {
 
 // Inside the reader: [[...]] links between memories and jump to the source session.
 bodyEl.addEventListener('click', e => {
+  const shot = e.target.closest('.shot');
+  if (shot) { shot.classList.toggle('zoom'); return; }
   const wl = e.target.closest('[data-wl]');
   if (wl) { openMemory(wl.dataset.wl); return; }
   const jump = e.target.closest('[data-chat]');

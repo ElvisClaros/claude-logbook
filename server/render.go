@@ -22,8 +22,9 @@ const dataMarker = "__DATA__"
 // ──────────────────────────────── validation ─────────────────────────────
 
 type Block struct {
-	R string `json:"r"`
-	X string `json:"x"`
+	R   string `json:"r"`
+	X   string `json:"x"`
+	Src string `json:"src,omitempty"`
 }
 
 // Session mirrors a record of sessions.py without its internal keys.
@@ -84,7 +85,16 @@ func ParsePayload(raw []byte, maxSessions int) (*Payload, []byte, error) {
 			return nil, nil, fmt.Errorf("payload: session %d: no c", i)
 		}
 		for j, b := range s.C {
-			if b.R != "u" && b.R != "a" && b.R != "t" && b.R != "c" && b.R != "d" {
+			switch b.R {
+			case "u", "a", "t", "c", "d":
+				if b.Src != "" {
+					return nil, nil, fmt.Errorf("payload: session %d block %d: src on a %q block", i, j, b.R)
+				}
+			case "i", "v":
+				if b.Src != "" && !validImage(b.Src) {
+					return nil, nil, fmt.Errorf("payload: session %d block %d: not a png, jpeg, gif or webp image", i, j)
+				}
+			default:
 				return nil, nil, fmt.Errorf("payload: session %d block %d: bad r", i, j)
 			}
 		}
@@ -98,6 +108,45 @@ func ParsePayload(raw []byte, maxSessions int) (*Payload, []byte, error) {
 	p.M = []json.RawMessage{}
 	clean, err := json.Marshal(p)
 	return &p, clean, err
+}
+
+// imageMagic is how each accepted format starts. SVG is not among them: it
+// is a document that can carry a script.
+var imageMagic = map[string][]string{
+	"png":  {"\x89PNG\r\n\x1a\n"},
+	"jpeg": {"\xff\xd8\xff"},
+	"gif":  {"GIF87a", "GIF89a"},
+	"webp": {"RIFF"},
+}
+
+// validImage accepts only a base64 data: URL whose bytes really are the
+// raster format it claims.
+func validImage(src string) bool {
+	rest, ok := strings.CutPrefix(src, "data:image/")
+	if !ok {
+		return false
+	}
+	kind, data, ok := strings.Cut(rest, ";base64,")
+	if !ok {
+		return false
+	}
+	magics, ok := imageMagic[kind]
+	if !ok {
+		return false
+	}
+	raw, err := base64.StdEncoding.DecodeString(data)
+	if err != nil {
+		return false
+	}
+	if kind == "webp" && (len(raw) < 12 || string(raw[8:12]) != "WEBP") {
+		return false
+	}
+	for _, m := range magics {
+		if bytes.HasPrefix(raw, []byte(m)) {
+			return true
+		}
+	}
+	return false
 }
 
 // ──────────────────────────────── html ───────────────────────────────────
@@ -169,6 +218,10 @@ func fmtStamp(s *string) string {
 	return t.UTC().Format("2006-01-02 15:04 UTC")
 }
 
+// lineBlock are the blocks printed as one "> " line; a run of them goes
+// together, after a blank line.
+var lineBlock = map[string]bool{"t": true, "d": true, "i": true, "v": true}
+
 // RenderText is the transcript in plain text, in the order the terminal
 // shows it with `claude-logbook -s`.
 func RenderText(p *Payload) []byte {
@@ -208,14 +261,23 @@ func RenderText(p *Payload) []byte {
 			}
 			switch c.R {
 			case "d":
-				if prev != "t" && prev != "d" {
+				if !lineBlock[prev] {
 					b.WriteString("\n")
 				}
 				fmt.Fprintf(&b, "> cd: %s\n", c.X)
 			case "c":
 				b.WriteString("\n--- context compacted here ---\n")
+			case "i", "v":
+				if !lineBlock[prev] {
+					b.WriteString("\n")
+				}
+				what := "image attached"
+				if c.R == "v" {
+					what = "image from the tool"
+				}
+				fmt.Fprintf(&b, "> %s\n", what)
 			case "t":
-				if prev != "t" && prev != "d" {
+				if !lineBlock[prev] {
 					b.WriteString("\n")
 				}
 				fmt.Fprintf(&b, "> tool: %s\n", strings.ReplaceAll(c.X, "\n", " "))

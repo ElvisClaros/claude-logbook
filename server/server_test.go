@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -142,6 +143,35 @@ func TestBranchAndDirectoryChange(t *testing.T) {
 	js := h.do("GET", "/share/"+r.ID+".json", "", "").Body.String()
 	if !strings.Contains(js, `"h":1,"o":"bbbbbbbb-0000","ot":"The original"`) {
 		t.Fatalf("json: %s", js)
+	}
+}
+
+func TestImages(t *testing.T) {
+	h := newHarness(t, nil)
+	png := "data:image/png;base64," + base64.StdEncoding.EncodeToString([]byte("\x89PNG\r\n\x1a\nrest"))
+	withImg := strings.Replace(session, `"c":[`, `"c":[{"r":"i","x":"[image]","src":"`+png+`"},{"r":"v","x":"[image]"},`, 1)
+	r := h.create(`{"payload":` + payload(withImg) + `}`)
+	if js := h.do("GET", "/share/"+r.ID+".json", "", "").Body.String(); !strings.Contains(js, png) {
+		t.Fatalf("image lost: %s", js)
+	}
+	txt := h.do("GET", "/share/"+r.ID+".txt", "", "").Body.String()
+	if !strings.Contains(txt, "> image attached\n> image from the tool\n") {
+		t.Fatalf("txt: %s", txt)
+	}
+
+	svg := "data:image/svg+xml;base64," + base64.StdEncoding.EncodeToString([]byte("<svg onload=alert(1)>"))
+	fake := "data:image/png;base64," + base64.StdEncoding.EncodeToString([]byte("<script>"))
+	for name, block := range map[string]string{
+		"svg":           `{"r":"i","x":"","src":"` + svg + `"}`,
+		"wrong bytes":   `{"r":"i","x":"","src":"` + fake + `"}`,
+		"not base64":    `{"r":"i","x":"","src":"data:image/png;base64,%%%"}`,
+		"remote":        `{"r":"i","x":"","src":"https://evil.test/x.png"}`,
+		"src on a text": `{"r":"u","x":"","src":"` + png + `"}`,
+	} {
+		bad := strings.Replace(session, `"c":[`, `"c":[`+block+`,`, 1)
+		if rec := h.do("POST", "/api/shares", `{"payload":`+payload(bad)+`}`, ""); rec.Code != 400 {
+			t.Errorf("%s: %d %s", name, rec.Code, rec.Body)
+		}
 	}
 }
 

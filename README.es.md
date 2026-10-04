@@ -95,6 +95,7 @@ claude-logbook docker -s 2         # lee el 2º de esos tres
 | `--html [FILE]` | Genera la página autocontenida con la misma selección que `--json` (por defecto `sessions.html`, o `session-<id>.html` con `-s`). |
 | `--template FILE` | Usa tu propio template para `--html`. |
 | `--open` | Abre en el navegador lo que haya generado `--html`. |
+| `--images` | Con `-s`: incluye las imágenes de la sesión en `--html`, `--json` o `--share`. |
 | `--no-cache` | Ignora el caché y re-parsea todo. |
 | `-m`, `--memory` | Trabaja sobre las memorias en vez de las sesiones. |
 | `--type TYPE` | Con `-m`: filtra por `project`, `user`, `feedback` o `reference`. |
@@ -224,6 +225,7 @@ su link:
 ```bash
 claude-logbook -s 3 --share               # muestra qué se sube y pregunta
 claude-logbook -s 3 --share --expire 7d   # desaparece en una semana (default 30 días)
+claude-logbook -s 3 --share --images      # con las capturas e imágenes
 claude-logbook -s 3 --share               # otra vez más tarde: mismo link, contenido nuevo
 claude-logbook --shares                   # qué compartiste y hasta cuándo
 claude-logbook --unshare 5d10f1ee         # bajarlo (id, URL o sesión)
@@ -250,6 +252,10 @@ Para tener en cuenta:
   devuelve un secret que se guarda en
   `$XDG_STATE_HOME/claude-logbook/shares.json` (`~/.local/state/...`), con modo
   600. Si perdés ese archivo, el share queda hasta que vence.
+- **Las imágenes van solo con `--images`**: las que pegaste y las que una
+  herramienta le dio a Claude (una captura, una imagen que leyó). El aviso no
+  mira dentro de ellas, así que revisalas antes. El servidor acepta hasta 20 MB
+  por share.
 - Las memorias nunca se comparten.
 
 El servidor está en [`server/`](server/README.md): Go, solo biblioteca estándar,
@@ -309,6 +315,10 @@ Algunos detalles que conviene saber:
   muestra colapsada bajo "Inherited history", y solo lo que vino después cuenta
   para los mensajes, la duración y la fecha de inicio. En la tabla la sesión
   lleva un chip `branch`.
+- **Imágenes.** La transcripción muestra dónde estaba cada una (`▣ image
+  attached`, `▣ image from the tool`). Las imágenes en sí van solo en el
+  `--html`, `--json` o `--share` de una sesión, con `--images`: PNG, JPEG, GIF y
+  WebP, nunca SVG.
 - **Cambios de directorio.** Cuando la sesión pasa a otro directorio (un `cd`
   que queda, `/cd`, un worktree) la transcripción muestra ahí `→ /ruta/nueva`, y
   `-p` también encuentra la sesión por cualquiera de los directorios donde trabajó.
@@ -360,7 +370,7 @@ Cada sesión de `s`:
 | `u` / `a` | Cantidad de mensajes tuyos / de Claude. En una rama, solo su parte propia. |
 | `k` | Tamaño del archivo en KB. |
 | `v` | Versión de Claude Code. |
-| `c` | Transcripción: `[{"r": "u"｜"a"｜"t"｜"c"｜"d", "x": texto}]`; `t` es una llamada a herramienta, `c` un resumen de compactación, `d` un cambio de directorio de trabajo. |
+| `c` | Transcripción: `[{"r": "u"｜"a"｜"t"｜"c"｜"d"｜"i"｜"v", "x": texto}]`; `t` es una llamada a herramienta, `c` un resumen de compactación, `d` un cambio de directorio de trabajo, `i` una imagen que adjuntaste y `v` una que una herramienta le dio a Claude. Con `--images` esas dos llevan `src`, la imagen como URL `data:`. |
 | `h` | Cuántos bloques al principio de `c` se heredaron de la sesión de la que salió esta rama (0 si no es una rama). |
 | `o` / `ot` | Id y título de esa sesión (`null` si no es una rama; `ot` también si ya no está en disco). |
 

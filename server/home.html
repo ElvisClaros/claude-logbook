@@ -59,6 +59,7 @@ claude-logbook                   <span class="c"># table of every session</span>
   <p>Pick a session by its number in the table or by a prefix of its UUID, then share it:</p>
 <pre><code>claude-logbook -s 3 --share                <span class="c"># asks before uploading</span>
 claude-logbook -s 5d10f1ee --share --expire 7d
+claude-logbook -s 3 --share --images       <span class="c"># with its images</span>
 claude-logbook --shares                    <span class="c"># what you have shared</span>
 claude-logbook --unshare 5d10f1ee          <span class="c"># take it down</span></code></pre>
   <p>Sharing the same session again updates it in place: the link stays the same.</p>
@@ -78,6 +79,7 @@ claude-logbook --unshare 5d10f1ee          <span class="c"># take it down</span>
   </div>
   <ul>
     <li><code>--share</code> warns if it spots things that look like API keys, tokens or private keys.</li>
+    <li>Images go only with <code>--images</code>, and nothing checks what they show: look at them first.</li>
     <li>Shares expire after 30 days unless you pick <code>--expire 1d</code>, <code>7d</code> or <code>90d</code>.</li>
     <li>Only the machine that created a share holds its secret and can update or delete it
         (<code>~/.local/state/claude-logbook/shares.json</code>).</li>

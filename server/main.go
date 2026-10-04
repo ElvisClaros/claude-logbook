@@ -392,7 +392,7 @@ func main() {
 	flag.StringVar(&cfg.Addr, "addr", env("ADDR", ":8181"), "listen address")
 	flag.StringVar(&cfg.DataDir, "data", env("DATA_DIR", "/data"), "where shares are stored")
 	flag.StringVar(&cfg.PublicURL, "public-url", env("PUBLIC_URL", "https://claude-logbook.all.ar"), "base of the URLs handed out")
-	flag.Int64Var(&cfg.MaxBytes, "max-bytes", envInt("MAX_BYTES", 10<<20), "largest request body")
+	flag.Int64Var(&cfg.MaxBytes, "max-bytes", envInt("MAX_BYTES", 20<<20), "largest request body")
 	maxSessions := flag.Int64("max-sessions", envInt("MAX_SESSIONS", 1), "sessions per share")
 	flag.StringVar(&cfg.TrustedProxy, "trusted-proxy", env("TRUSTED_PROXY", ""), "IPs/CIDRs whose X-Forwarded-For is believed (comma separated)")
 	creates := flag.Int64("creates-per-hour", envInt("CREATES_PER_HOUR", 10), "new shares per IP and hour")
@@ -421,7 +421,7 @@ func main() {
 		Addr:              cfg.Addr,
 		Handler:           srv.Routes(),
 		ReadHeaderTimeout: 10 * time.Second,
-		ReadTimeout:       60 * time.Second,
+		ReadTimeout:       180 * time.Second, // 20 MB of images on a slow uplink
 		WriteTimeout:      60 * time.Second,
 		IdleTimeout:       120 * time.Second,
 		MaxHeaderBytes:    16 << 10,

@@ -26,6 +26,8 @@ creation can replace or delete it. The server keeps only the secret's SHA-256.
   two inline scripts by hash: no inline handlers, no external anything.
 - Share ids are 10 base62 characters from `crypto/rand`; pages carry
   `X-Robots-Tag: noindex` and `Referrer-Policy: no-referrer`.
+- Images (`--images`) are accepted only as base64 `data:` URLs of PNG, JPEG,
+  GIF or WebP whose bytes match the format they claim; SVG never.
 - Limits: request body (`MAX_BYTES`), sessions per share (`MAX_SESSIONS`),
   and a token bucket per client IP for creations and for updates/deletes.
 - `X-Forwarded-For` is believed only when the connection comes from
@@ -41,7 +43,7 @@ Content is **not encrypted**: whoever runs the server can read the shares.
 | `ADDR` | `-addr` | `:8181` |
 | `DATA_DIR` | `-data` | `/data` |
 | `PUBLIC_URL` | `-public-url` | `https://claude-logbook.all.ar` |
-| `MAX_BYTES` | `-max-bytes` | `10485760` (10 MB) |
+| `MAX_BYTES` | `-max-bytes` | `20971520` (20 MB) |
 | `MAX_SESSIONS` | `-max-sessions` | `1` |
 | `TRUSTED_PROXY` | `-trusted-proxy` | empty: trust no proxy (IPs or CIDRs, comma separated) |
 | `CREATES_PER_HOUR` | `-creates-per-hour` | `10` per IP |
@@ -93,7 +95,7 @@ certificate (Let's Encrypt) and *Force SSL*. Add this under *Advanced* so
 uploads up to `MAX_BYTES` get through:
 
 ```nginx
-client_max_body_size 10m;
+client_max_body_size 20m;
 ```
 
 `TRUSTED_PROXY` must be the address the connections from NPM arrive from.

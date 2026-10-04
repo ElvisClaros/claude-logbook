@@ -95,6 +95,7 @@ claude-logbook docker -s 2         # reads the 2nd of those three
 | `--html [FILE]` | Build the standalone page with the same selection as `--json` (default `sessions.html`, or `session-<id>.html` with `-s`). |
 | `--template FILE` | Use your own template for `--html`. |
 | `--open` | Open whatever `--html` produced in your browser. |
+| `--images` | With `-s`: include the session's images in `--html`, `--json` or `--share`. |
 | `--no-cache` | Ignore the cache and re-parse everything. |
 | `-m`, `--memory` | Work on memories instead of sessions. |
 | `--type KIND` | With `-m`: filter by `project`, `user`, `feedback` or `reference`. |
@@ -223,6 +224,7 @@ prints its link:
 ```bash
 claude-logbook -s 3 --share               # shows what goes up and asks
 claude-logbook -s 3 --share --expire 7d   # gone in a week (default 30 days)
+claude-logbook -s 3 --share --images      # with the screenshots and pictures
 claude-logbook -s 3 --share               # again later: same link, new content
 claude-logbook --shares                   # what you have shared, and until when
 claude-logbook --unshare 5d10f1ee         # take it down (id, URL or session)
@@ -249,6 +251,9 @@ What to keep in mind:
   `$XDG_STATE_HOME/claude-logbook/shares.json` (`~/.local/state/...`), mode
   600. Lose that file and the share stays until it expires.
 - Memories are never shared.
+- **Images go only with `--images`**: the ones you pasted and the ones a tool
+  handed to Claude (a screenshot, an image it read). The warning does not look
+  inside them, so check them first. The server takes up to 20 MB per share.
 
 The server lives in [`server/`](server/README.md): Go, standard library only,
 a `FROM scratch` Docker image. You can run your own and point
@@ -309,6 +314,10 @@ A few details worth knowing:
   shown collapsed under "Inherited history", and only what came after counts
   towards the messages, the duration and the start date. In the table the
   session carries a `branch` chip.
+- **Images.** The transcript shows where each one was (`▣ image attached`,
+  `▣ image from the tool`). The pictures themselves only go into a single
+  session's `--html`, `--json` or `--share` with `--images`: PNG, JPEG, GIF
+  and WebP, never SVG.
 - **Directory changes.** When the session moves to another directory (a `cd`
   that sticks, `/cd`, a worktree) the transcript shows `→ /new/path` there, and
   `-p` also finds the session by any directory it worked in.
@@ -358,7 +367,7 @@ Each session in `s`:
 | `u` / `a` | Message counts, yours / Claude's. In a branch, only its own part. |
 | `k` | File size in KB. |
 | `v` | Claude Code version. |
-| `c` | Transcript: `[{"r": "u"｜"a"｜"t"｜"c"｜"d", "x": text}]`; `t` is a tool call, `c` a compaction summary, `d` a change of working directory. |
+| `c` | Transcript: `[{"r": "u"｜"a"｜"t"｜"c"｜"d"｜"i"｜"v", "x": text}]`; `t` is a tool call, `c` a compaction summary, `d` a change of working directory, `i` an image you attached and `v` one a tool gave Claude. With `--images` those two carry `src`, the picture as a `data:` URL. |
 | `h` | How many blocks at the start of `c` were inherited from the session this one branched from (0 if not a branch). |
 | `o` / `ot` | Id and title of that session (`null` if not a branch; `ot` also if it is no longer on disk). |
 

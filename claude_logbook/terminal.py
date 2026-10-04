@@ -236,6 +236,13 @@ def print_chat(s, st, out, show_tools=True, width=None):
             first = False
             divider(" context compacted here ")
             continue
+        if m["r"] in ("i", "v"):
+            # An image cannot be printed here: only that it was there.
+            if m["r"] == "i" or show_tools:
+                what = "image attached" if m["r"] == "i" else "image from the tool"
+                print(f"  {st.faint}▣ {what}{st.reset}", file=out)
+                first = False
+            continue
         if m["r"] == "d":
             print(f"  {st.faint}→ {clip(m['x'], body - 4)}{st.reset}", file=out)
             first = False

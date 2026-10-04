@@ -10,8 +10,8 @@ import webbrowser
 
 from . import __version__
 from .sessions import (
-    SessionError, apply_filters, default_root, drop_from_cache, latest_activity,
-    load_sessions, pick, public_records, session_path,
+    SessionError, apply_filters, count_images, default_root, drop_from_cache,
+    latest_activity, load_sessions, pick, public_records, session_path, with_images,
 )
 from .terminal import (
     Style, clip, fmt_date, fmt_size, plural, print_audit, print_chat,
@@ -77,6 +77,7 @@ user settings unless -p names a project, then to its settings.local.json;
 sharing (one session, readable by anyone with the link; asks first unless -y):
   claude-logbook -s 3 --share               upload #3, prints its link
   claude-logbook -s 3 --share --expire 7d   gone in a week (default 30d)
+  claude-logbook -s 3 --share --images      with the screenshots and pictures
   claude-logbook --shares                   what this machine has shared
   claude-logbook --unshare 5d10f1ee         delete it (share id, URL or session)
 """
@@ -149,6 +150,9 @@ def build_parser():
                         help="use another template for --html")
     output_path.add_argument("--open", action="store_true",
                         help="open what --html writes in the browser")
+    output_path.add_argument("--images", action="store_true",
+                        help="with -s: include the session's images in --html, "
+                             "--json or --share")
 
     sharing = ap.add_argument_group("share")
     sharing.add_argument("--share", action="store_true",
@@ -296,7 +300,8 @@ def export_selection(sessions, args):
     only the memories of the projects that made it. A single session (-s) goes
     alone, as it would be shared: no memories."""
     if args.show:
-        return [pick(filtered(sessions, args), args.show)], []
+        s = pick(filtered(sessions, args), args.show)
+        return [with_images(s) if args.images else s], []
     else:
         chosen = filtered(sessions, args)
         if args.limit:
@@ -598,6 +603,9 @@ def cmd_share(sessions, args, st):
     if s["e"]:
         raise SessionError("that session has no messages, there is nothing to share")
     server = share.server_url(args.server)
+    if args.images:
+        s = with_images(s)
+    images, with_src = count_images(s)
     payload = webpage.build_payload(public_records([s]), [])
     size = len(json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode())
     old = share.entry_for_session(share.load_registry(), s["id"], server)
@@ -606,6 +614,12 @@ def cmd_share(sessions, args, st):
     print(f"{st.bold}{s['t'] or 'Untitled session'}{st.reset}", file=err)
     print(f"  {short_home(s['p'])}  ·  {s['u']} yours / {s['a']} from Claude  ·  "
           f"{len(s['c'])} blocks  ·  {fmt_size(size / 1024)}", file=err)
+    if with_src:
+        print(f"  {plural(with_src, 'image', 'images')} included; they are not "
+              f"checked for secrets, look at them first", file=err)
+    elif images:
+        print(f"  {plural(images, 'image', 'images')} left out (add --images "
+              f"to include them)", file=err)
     where = f"updates {old['url']}" if old else f"new link on {server}"
     print(f"  {where}, expires in {args.expire}", file=err)
     for kind, blocks in share.scan_secrets(payload):
@@ -623,7 +637,12 @@ def cmd_share(sessions, args, st):
         print("Nothing was uploaded.", file=err)
         return 1
 
-    entry, created = share.publish(server, payload, args.expire, s["id"], s["t"])
+    try:
+        entry, created = share.publish(server, payload, args.expire, s["id"], s["t"])
+    except SessionError as e:
+        if with_src and "too large" in str(e):
+            raise SessionError(f"{e}; try it without --images") from None
+        raise
     print(f"{'Shared' if created else 'Updated'} · expires {fmt_expiry(entry)}", file=err)
     print(entry["url"])
     print(f"{st.faint}  {entry['url']}.txt  ·  {entry['url']}.json{st.reset}", file=err)
@@ -683,6 +702,9 @@ def run(args):
 
     if args.memory:
         return run_memory(sessions, args, st)
+
+    if args.images and not args.show:
+        raise SessionError("--images needs a session (-s REF)")
 
     if args.share:
         return cmd_share(sessions, args, st)

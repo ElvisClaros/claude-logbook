@@ -19,9 +19,11 @@ Schema of the record returned by `read_session`:
     u/a  number of messages from you / from Claude
     k    size of the .jsonl in KB
     v    Claude Code version
-    c    transcript: [{"r": "u" | "a" | "t" | "c" | "d", "x": text}]
+    c    transcript: [{"r": "u" | "a" | "t" | "c" | "d" | "i" | "v", "x": text}]
          (t: tool call summary, c: compaction summary, d: the working
-         directory changed to x)
+         directory changed to x, i: an image you attached, v: an image a
+         tool gave Claude). Image blocks carry the picture itself in "src",
+         as a data: URL, only when read with `images=True`
     h    how many blocks at the start of `c` were copied from the session
          this one branched from (/branch); 0 if it is not a branch
     o    id of that session, or None
@@ -42,7 +44,7 @@ from datetime import datetime, timezone
 
 # Bump it when the record schema changes: it invalidates old caches instead of
 # reading records with the previous shape.
-CACHE_VERSION = 4
+CACHE_VERSION = 5
 
 EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
 
@@ -136,6 +138,30 @@ def tool_summary(block):
     return f"{name}: {val}" if val else name
 
 
+# The formats a browser shows that cannot carry a script (so no SVG).
+IMAGE_TYPES = ("image/png", "image/jpeg", "image/gif", "image/webp")
+
+
+def image_src(block):
+    """data: URL of an image block, or None if it is not one we can show."""
+    src = block.get("source")
+    if not isinstance(src, dict) or src.get("type") != "base64":
+        return None
+    kind, data = src.get("media_type"), src.get("data")
+    if kind not in IMAGE_TYPES or not isinstance(data, str) or not data:
+        return None
+    return f"data:{kind};base64,{data}"
+
+
+def image_block(role, block, images):
+    out = {"r": role, "x": "[image]"}
+    if images:
+        src = image_src(block)
+        if src:
+            out["src"] = src
+    return out
+
+
 def blocks_of(message):
     content = message.get("content")
     if isinstance(content, str):
@@ -167,8 +193,10 @@ def active_minutes(stamps):
     return round(total)
 
 
-def read_session(path):
-    """Parses a whole .jsonl and returns that session's record."""
+def read_session(path, images=False):
+    """Parses a whole .jsonl and returns that session's record. With images
+    the image blocks bring the pictures, which can weigh megabytes: that
+    record is for a single export, never for the cache."""
     session_id = os.path.basename(path)[:-6]  # without .jsonl
     first_ts = last_ts = cwd = here = git_branch = version = None
     origin = None  # the session /branch copied the history from
@@ -263,7 +291,12 @@ def read_session(path):
                                 fallback_title = text[:TITLE_MAX]
                             convo.append({"r": "u", "x": text})
                     elif b.get("type") == "image":
-                        convo.append({"r": "u", "x": "[imagen adjunta]"})
+                        convo.append(image_block("i", b, images))
+                    elif b.get("type") == "tool_result" and isinstance(b.get("content"), list):
+                        # What a tool handed back to Claude: a screenshot, an image it read.
+                        for part in b["content"]:
+                            if isinstance(part, dict) and part.get("type") == "image":
+                                convo.append(image_block("v", part, images))
             else:
                 counted = False
                 for b in blocks_of(message):
@@ -415,6 +448,18 @@ def load_sessions(root=None, cache_path=None, use_cache=True):
     _fill_gaps(sessions)
     sessions.sort(key=lambda s: parse_ts(s["l"]) or EPOCH, reverse=True)
     return sessions
+
+
+def with_images(s, root=None):
+    """The same record with its pictures, read again from its .jsonl."""
+    full = read_session(session_path(s, root), images=True)
+    return {**s, "c": full["c"]}
+
+
+def count_images(s):
+    """(images, of which with the picture) in a record."""
+    imgs = [m for m in s["c"] if m["r"] in ("i", "v")]
+    return len(imgs), sum(1 for m in imgs if m.get("src"))
 
 
 def latest_activity(sessions):
