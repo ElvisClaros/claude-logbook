@@ -304,6 +304,14 @@ A few details worth knowing:
 - **Compaction.** When the context runs out (or on `/compact`) Claude Code
   replaces the earlier conversation with a summary. That summary is shown as a
   "context compacted here" mark, not as a message of yours, and is not counted.
+- **Branches.** `/branch` (and `/fork`) start a new session that copies the
+  history of the original. claude-logbook reads the copy as inherited: it is
+  shown collapsed under "Inherited history", and only what came after counts
+  towards the messages, the duration and the start date. In the table the
+  session carries a `branch` chip.
+- **Directory changes.** When the session moves to another directory (a `cd`
+  that sticks, `/cd`, a worktree) the transcript shows `→ /new/path` there, and
+  `-p` also finds the session by any directory it worked in.
 - **Duration** is active time: the gaps between messages, leaving out pauses
   longer than 30 minutes. A session resumed over several days does not count
   the days in between.
@@ -346,11 +354,13 @@ Each session in `s`:
 | `e` | `true` if the session has no messages. |
 | `i` | `true` if `p` was inferred from a sibling session. |
 | `f` / `l` | First and last event timestamps (ISO 8601). |
-| `d` | Active minutes (pauses over 30 minutes left out). |
-| `u` / `a` | Message counts, yours / Claude's. |
+| `d` | Active minutes (pauses over 30 minutes left out). In a branch, only its own part. |
+| `u` / `a` | Message counts, yours / Claude's. In a branch, only its own part. |
 | `k` | File size in KB. |
 | `v` | Claude Code version. |
-| `c` | Transcript: `[{"r": "u"｜"a"｜"t"｜"c", "x": text}]`; `t` is a tool call, `c` a compaction summary. |
+| `c` | Transcript: `[{"r": "u"｜"a"｜"t"｜"c"｜"d", "x": text}]`; `t` is a tool call, `c` a compaction summary, `d` a change of working directory. |
+| `h` | How many blocks at the start of `c` were inherited from the session this one branched from (0 if not a branch). |
+| `o` / `ot` | Id and title of that session (`null` if not a branch; `ot` also if it is no longer on disk). |
 
 Each memory in `m`:
 

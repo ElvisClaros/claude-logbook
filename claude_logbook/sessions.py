@@ -19,8 +19,16 @@ Schema of the record returned by `read_session`:
     u/a  number of messages from you / from Claude
     k    size of the .jsonl in KB
     v    Claude Code version
-    c    transcript: [{"r": "u" | "a" | "t" | "c", "x": text}]
-         (t: tool call summary, c: compaction summary)
+    c    transcript: [{"r": "u" | "a" | "t" | "c" | "d", "x": text}]
+         (t: tool call summary, c: compaction summary, d: the working
+         directory changed to x)
+    h    how many blocks at the start of `c` were copied from the session
+         this one branched from (/branch); 0 if it is not a branch
+    o    id of that session, or None
+    ot   its title, if it is still on disk (filled in by `_fill_gaps`)
+
+A branch starts as a copy of the original's history. Only what came after
+counts towards `u`, `a`, `d` and `f`; the copy stays in `c`, first.
 
 `project_dir` and `mtime` are internal and never leave the module:
 `public_records()` drops them before the record is serialized.
@@ -34,7 +42,7 @@ from datetime import datetime, timezone
 
 # Bump it when the record schema changes: it invalidates old caches instead of
 # reading records with the previous shape.
-CACHE_VERSION = 3
+CACHE_VERSION = 4
 
 EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
 
@@ -162,7 +170,10 @@ def active_minutes(stamps):
 def read_session(path):
     """Parses a whole .jsonl and returns that session's record."""
     session_id = os.path.basename(path)[:-6]  # without .jsonl
-    first_ts = last_ts = cwd = git_branch = version = None
+    first_ts = last_ts = cwd = here = git_branch = version = None
+    origin = None  # the session /branch copied the history from
+    inherited = None  # blocks of c that came with that copy
+    old_first_ts = None  # first timestamp of the copied rows
     ai_title = custom_title = fallback_title = None
     stamps = []  # of the messages, for the active time
     user_msgs = assistant_msgs = 0
@@ -191,13 +202,22 @@ def read_session(path):
                     custom_title = obj["customTitle"]  # /rename, wins over the AI one
                 continue
 
+            # /branch copies the original rows into the new file, each one
+            # marked with where it came from. They come first.
+            forked = obj.get("forkedFrom")
+            copied = isinstance(forked, dict)
+            if copied and forked.get("sessionId"):
+                origin = forked["sessionId"]
+
             ts = obj.get("timestamp")
             if ts:
-                if first_ts is None:
+                if copied:
+                    old_first_ts = old_first_ts or ts
+                elif first_ts is None:
                     first_ts = ts
                 last_ts = ts
             if cwd is None and obj.get("cwd"):
-                cwd = obj["cwd"]
+                cwd = here = obj["cwd"]
             if git_branch is None and obj.get("gitBranch"):
                 git_branch = obj["gitBranch"]
             if obj.get("version"):
@@ -209,8 +229,17 @@ def read_session(path):
             message = obj.get("message")
             if not isinstance(message, dict):
                 continue
-            if ts:
-                stamps.append(ts)
+            if not copied:
+                if origin and inherited is None:
+                    inherited = len(convo)  # the branch's own part starts here
+                if ts:
+                    stamps.append(ts)
+            # A `cd` that sticks, /cd or a worktree: from here on the session
+            # works somewhere else. Only messages count, so a subagent or a
+            # hook running elsewhere does not move it.
+            if obj.get("cwd") and obj["cwd"] != here:
+                here = obj["cwd"]
+                convo.append({"r": "d", "x": here})
 
             if kind == "user":
                 if obj.get("isMeta"):
@@ -229,7 +258,7 @@ def read_session(path):
                     if b.get("type") == "text":
                         text = clean_text(b.get("text"))
                         if text:
-                            user_msgs += 1
+                            user_msgs += not copied
                             if fallback_title is None:
                                 fallback_title = text[:TITLE_MAX]
                             convo.append({"r": "u", "x": text})
@@ -247,7 +276,7 @@ def read_session(path):
                             counted = True
                     elif b.get("type") == "tool_use":
                         convo.append({"r": "t", "x": tool_summary(b)})
-                if counted:
+                if counted and not copied:
                     assistant_msgs += 1
 
     st = os.stat(path)
@@ -255,8 +284,8 @@ def read_session(path):
     # `claude -p` with something piped on stdin (e.g. a git diff to write the
     # commit message), not of a conversation.
     noninteractive = (
-        user_msgs == 1 and not (ai_title or custom_title) and bool(convo)
-        and len(convo[0]["x"]) > NONINTERACTIVE_CHARS
+        user_msgs == 1 and not (ai_title or custom_title) and not origin
+        and len(next((b["x"] for b in convo if b["r"] == "u"), "")) > NONINTERACTIVE_CHARS
     )
 
     return {
@@ -267,8 +296,8 @@ def read_session(path):
         "t": custom_title or ai_title or fallback_title,
         "ai": bool(custom_title or ai_title),
         "n": noninteractive,
-        "e": not convo,
-        "f": first_ts,
+        "e": all(b["r"] == "d" for b in convo),
+        "f": first_ts or old_first_ts,
         "l": last_ts,
         "d": active_minutes(stamps),
         "u": user_msgs,
@@ -276,6 +305,8 @@ def read_session(path):
         "k": round(st.st_size / 1024, 1),
         "v": version,
         "c": convo,
+        "h": (len(convo) if inherited is None else inherited) if origin else 0,
+        "o": origin,
         "mtime": datetime.fromtimestamp(st.st_mtime, tz=timezone.utc).isoformat(),
     }
 
@@ -324,6 +355,8 @@ def drop_from_cache(paths, cache_path=None):
 def _fill_gaps(sessions):
     """Fills in what is missing after parsing every file.
 
+    A branch gets the title of the session it came from, if it is still there.
+
     Some sessions (a cancelled /resume) never record a cwd. The directory name
     cannot be reliably reversed because "/" and "." are both encoded as "-", so
     the path is borrowed from another session of the same project and flagged in
@@ -334,7 +367,9 @@ def _fill_gaps(sessions):
         if s["p"]:
             known.setdefault(s["project_dir"], s["p"])
 
+    titles = {s["id"]: s["t"] for s in sessions}
     for s in sessions:
+        s["ot"] = titles.get(s["o"]) if s["o"] else None
         s["i"] = not s["p"]
         if not s["p"]:
             s["p"] = known.get(s["project_dir"], s["project_dir"])
@@ -403,7 +438,9 @@ def apply_filters(sessions, project=None, grep=None, query=None,
 
     if project:
         needle = os.path.expanduser(project).rstrip("/").lower()
-        out = [s for s in out if needle in s["p"].lower()]
+        # Any directory it worked in: where it started or one it moved to.
+        out = [s for s in out if needle in s["p"].lower()
+               or any(m["r"] == "d" and needle in m["x"].lower() for m in s["c"])]
 
     if grep:
         needle = grep.lower()

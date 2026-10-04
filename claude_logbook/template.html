@@ -547,6 +547,28 @@
   .compact[open] summary::before { content: '▾ '; }
   .compact .bubble { margin-top: 8px; font-size: 13.5px; }
 
+  .inherited { margin: 0 0 6px; }
+  .inherited summary { border-top: 0; }
+  .inherited-body { padding: 14px 0 4px; opacity: .78; }
+  .inherited-body > :first-child { margin-top: 0; }
+  .inherited-end {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--muted);
+    text-align: center;
+    padding: 6px 0;
+    margin-top: 14px;
+    border-bottom: 1px dashed var(--line);
+  }
+
+  .cwd {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--muted);
+    padding: 3px 0 3px 12px;
+    overflow-wrap: anywhere;
+  }
+
   .reader-empty { color: var(--muted); font-family: var(--mono); font-size: 13px; text-align: center; padding: 60px 20px; }
 
   /* ---------- toast ---------- */
@@ -1079,6 +1101,7 @@ function renderSessions() {
       d.n ? '<span class="chip chip-auto">non-interactive</span>' : '',
       d.b && d.b !== 'HEAD' ? `<span class="chip chip-branch">${esc(d.b)}</span>` : '',
       d.i ? '<span class="chip" title="Path deduced from other sessions of the same project">inferred path</span>' : '',
+      d.o ? `<span class="chip" title="Branched from ${esc(d.ot || d.o)}">branch</span>` : '',
     ].join('');
 
     return `
@@ -1193,6 +1216,16 @@ function showReader() {
   if (!SINGLE) readerEl.focus();
 }
 
+function blockHtml(m) {
+  return m.r === 't'
+    ? `<div class="tool"><b>⚒</b><span>${esc(m.x)}</span></div>`
+    : m.r === 'd'
+    ? `<div class="cwd">→ ${esc(m.x)}</div>`
+    : m.r === 'c'
+    ? `<details class="compact"><summary>Context compacted here · the summary Claude kept</summary><div class="bubble">${renderBody(m.x)}</div></details>`
+    : `<div class="turn turn-${m.r}"><span class="who">${WHO[m.r]}</span><div class="bubble">${renderBody(m.x)}</div></div>`;
+}
+
 function openChat(id) {
   const d = BY_ID.get(id);
   if (!d || (d.e && !SINGLE)) return;
@@ -1210,13 +1243,12 @@ function openChat(id) {
     `<span class="chip">${d.id.slice(0, 8)}</span>`,
   ].filter(Boolean).join('');
 
+  const h = d.h || 0, old = d.c.slice(0, h), own = d.c.slice(h);
+  const inherited = h
+    ? `<details class="compact inherited"><summary>Inherited history · ${old.filter(m => m.r === 'u' || m.r === 'a').length} messages from “${esc(d.ot || d.o.slice(0, 8))}”</summary><div class="inherited-body">${old.map(blockHtml).join('')}<div class="inherited-end">the branch starts here</div></div></details>`
+    : '';
   bodyEl.innerHTML = d.c.length
-    ? d.c.map(m => m.r === 't'
-        ? `<div class="tool"><b>⚒</b><span>${esc(m.x)}</span></div>`
-        : m.r === 'c'
-        ? `<details class="compact"><summary>Context compacted here · the summary Claude kept</summary><div class="bubble">${renderBody(m.x)}</div></details>`
-        : `<div class="turn turn-${m.r}"><span class="who">${WHO[m.r]}</span><div class="bubble">${renderBody(m.x)}</div></div>`
-      ).join('')
+    ? inherited + own.map(blockHtml).join('')
     : `<p class="reader-empty">This session has no messages.</p>`;
 
   if (!SINGLE && location.hash.slice(1) !== id) history.replaceState(null, '', '#' + id);

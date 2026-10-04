@@ -212,17 +212,33 @@ def print_chat(s, st, out, show_tools=True, width=None):
         print(f"{st.dim}This session has no messages.{st.reset}", file=out)
         return
 
+    def divider(label):
+        side = max(3, (min(width, 80) - len(label)) // 2)
+        print(f"{st.faint}{'─' * side}{label}{'─' * side}{st.reset}", file=out)
+
     first = True
-    for m in s["c"]:
+    blocks = s["c"]
+    if s.get("h"):
+        # A branch: what it copied from the original is in that session, so
+        # here it is only a mark of where its own part starts.
+        old = blocks[:s["h"]]
+        n = sum(m["r"] in "ua" for m in old)
+        origin = s.get("ot") or (s.get("o") or "?")[:8]
+        divider(f" {n} messages inherited from {clip(origin, 40)} ")
+        blocks = blocks[s["h"]:]
+        first = False
+    for m in blocks:
         if m["r"] == "c":
             # The summary is long and Claude's, not part of the dialogue:
             # only the mark of where the earlier context was folded.
             if not first:
                 print(file=out)
             first = False
-            label = " context compacted here "
-            side = max(3, (min(width, 80) - len(label)) // 2)
-            print(f"{st.faint}{'─' * side}{label}{'─' * side}{st.reset}", file=out)
+            divider(" context compacted here ")
+            continue
+        if m["r"] == "d":
+            print(f"  {st.faint}→ {clip(m['x'], body - 4)}{st.reset}", file=out)
+            first = False
             continue
         if m["r"] == "t":
             if show_tools:

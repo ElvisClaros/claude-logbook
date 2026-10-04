@@ -142,6 +142,69 @@ class TestTitlesCompactionDuration(TempRoot):
         self.assertEqual(S.active_minutes([ts(0), ts(30), ts(31, hour=11)]), 30)
 
 
+class TestBranchesAndDirectories(TempRoot):
+    ORIGIN = "33333333-0000-0000-0000-000000000001"
+
+    def branch(self, own=True):
+        fork = {"forkedFrom": {"sessionId": self.ORIGIN, "messageUuid": "x"}}
+        events = [
+            user("the original question", at=ts(0, hour=8), **fork),
+            assistant("the original answer", at=ts(5, hour=8), **fork),
+            {"type": "custom-title", "customTitle": "Try another way (Branch)"},
+        ]
+        if own:
+            events += [user("and now this", at=ts(0)), assistant("ok", at=ts(10))]
+        return write_session(self.root, "-home-u-proj",
+                             "33333333-0000-0000-0000-000000000002", events)
+
+    def test_the_copied_history_is_inherited(self):
+        rec = S.read_session(self.branch())
+        self.assertEqual(rec["o"], self.ORIGIN)
+        self.assertEqual(rec["h"], 2)
+        self.assertEqual([m["x"] for m in rec["c"][2:]], ["and now this", "ok"])
+        self.assertEqual((rec["u"], rec["a"], rec["d"]), (1, 1, 10))
+        self.assertEqual(rec["f"], ts(0))
+        self.assertEqual(rec["t"], "Try another way (Branch)")
+
+    def test_a_branch_with_nothing_of_its_own(self):
+        rec = S.read_session(self.branch(own=False))
+        self.assertEqual((rec["h"], rec["u"], rec["a"]), (2, 0, 0))
+        self.assertFalse(rec["e"])
+        self.assertEqual(rec["f"], ts(0, hour=8))
+
+    def test_not_a_branch(self):
+        path = write_session(self.root, "-p", "33333333-0000-0000-0000-000000000003", [
+            user("hello", at=ts(0))])
+        rec = S.read_session(path)
+        self.assertEqual((rec["h"], rec["o"]), (0, None))
+
+    def test_the_origin_title_is_filled_in(self):
+        self.branch()
+        write_session(self.root, "-home-u-proj", self.ORIGIN, [
+            ai_title("The original"), user("the original question", at=ts(0, hour=8))])
+        by_id = {s["id"]: s for s in S.load_sessions(self.root, use_cache=False)}
+        self.assertEqual(by_id["33333333-0000-0000-0000-000000000002"]["ot"], "The original")
+        self.assertIsNone(by_id[self.ORIGIN]["ot"])
+
+    def test_directory_changes_are_marked_and_filtered(self):
+        path = write_session(self.root, "-home-u-proj", "33333333-0000-0000-0000-000000000004", [
+            {"type": "system", "timestamp": ts(0), "cwd": "/home/u/proj"},
+            user("build it", at=ts(1)),
+            assistant("ok", at=ts(2), cwd="/home/u/proj/server"),
+            assistant("again", at=ts(3), cwd="/home/u/proj/server"),
+            assistant("isSidechain", at=ts(3), cwd="/elsewhere", isSidechain=True),
+            user("back", at=ts(4)),
+        ])
+        rec = S.read_session(path)
+        self.assertEqual(rec["p"], "/home/u/proj")
+        self.assertEqual([(m["r"], m["x"]) for m in rec["c"]], [
+            ("u", "build it"), ("d", "/home/u/proj/server"), ("a", "ok"),
+            ("a", "again"), ("d", "/home/u/proj"), ("u", "back")])
+        S._fill_gaps([rec])
+        self.assertEqual(S.apply_filters([rec], project="proj/server"), [rec])
+        self.assertEqual(S.apply_filters([rec], project="/elsewhere"), [])
+
+
 class TestToolSummary(unittest.TestCase):
     def test_uses_the_representative_parameter(self):
         self.assertEqual(

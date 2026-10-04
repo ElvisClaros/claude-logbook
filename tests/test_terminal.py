@@ -135,6 +135,18 @@ class TestOutput(unittest.TestCase):
         self.assertIn("context compacted here", out)
         self.assertNotIn("SUMMARY TEXT", out)
 
+    def test_branch_hides_what_it_inherited(self):
+        buf = io.StringIO()
+        c = [{"r": "u", "x": "OLD QUESTION"}, {"r": "a", "x": "OLD ANSWER"},
+             {"r": "d", "x": "/home/u/proj/sub"}, {"r": "u", "x": "new one"}]
+        T.print_chat(self.session_item(c=c, h=2, o="12345678-aa", ot="The original"),
+                     T.Style(False), buf)
+        out = buf.getvalue()
+        self.assertIn("2 messages inherited from The original", out)
+        self.assertNotIn("OLD", out)
+        self.assertIn("→ /home/u/proj/sub", out)
+        self.assertIn("new one", out)
+
     def test_empty_session_says_so(self):
         buf = io.StringIO()
         T.print_chat(self.session_item(c=[], t=None), T.Style(False), buf)

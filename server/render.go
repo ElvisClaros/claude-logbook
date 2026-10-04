@@ -45,6 +45,9 @@ type Session struct {
 	K  float64  `json:"k"`
 	V  *string  `json:"v"`
 	C  []Block  `json:"c"`
+	H  int      `json:"h"`
+	O  *string  `json:"o"`
+	OT *string  `json:"ot"`
 }
 
 type Payload struct {
@@ -81,9 +84,15 @@ func ParsePayload(raw []byte, maxSessions int) (*Payload, []byte, error) {
 			return nil, nil, fmt.Errorf("payload: session %d: no c", i)
 		}
 		for j, b := range s.C {
-			if b.R != "u" && b.R != "a" && b.R != "t" && b.R != "c" {
+			if b.R != "u" && b.R != "a" && b.R != "t" && b.R != "c" && b.R != "d" {
 				return nil, nil, fmt.Errorf("payload: session %d block %d: bad r", i, j)
 			}
+		}
+		if s.H < 0 || s.H > len(s.C) {
+			return nil, nil, fmt.Errorf("payload: session %d: bad h", i)
+		}
+		if s.O != nil && !sessionIDRE.MatchString(*s.O) {
+			return nil, nil, fmt.Errorf("payload: session %d: bad o", i)
 		}
 	}
 	p.M = []json.RawMessage{}
@@ -185,12 +194,28 @@ func RenderText(p *Payload) []byte {
 			continue
 		}
 		prev := ""
-		for _, c := range s.C {
+		for j, c := range s.C {
+			if s.H > 0 && j == 0 {
+				origin := deref(s.OT, "")
+				if origin == "" && s.O != nil {
+					origin = *s.O
+				}
+				fmt.Fprintf(&b, "\n--- inherited history, from %s ---\n", origin)
+			}
+			if s.H > 0 && j == s.H {
+				b.WriteString("\n--- the branch starts here ---\n")
+				prev = ""
+			}
 			switch c.R {
+			case "d":
+				if prev != "t" && prev != "d" {
+					b.WriteString("\n")
+				}
+				fmt.Fprintf(&b, "> cd: %s\n", c.X)
 			case "c":
 				b.WriteString("\n--- context compacted here ---\n")
 			case "t":
-				if prev != "t" {
+				if prev != "t" && prev != "d" {
 					b.WriteString("\n")
 				}
 				fmt.Fprintf(&b, "> tool: %s\n", strings.ReplaceAll(c.X, "\n", " "))

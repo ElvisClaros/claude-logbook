@@ -304,6 +304,14 @@ Algunos detalles que conviene saber:
 - **Compactación.** Cuando se acaba el contexto (o con `/compact`) Claude Code
   reemplaza la conversación anterior por un resumen. Ese resumen se muestra como
   una marca "context compacted here", no como un mensaje tuyo, y no se cuenta.
+- **Ramas.** `/branch` (y `/fork`) arrancan una sesión nueva que copia el
+  historial de la original. claude-logbook toma esa copia como heredada: se
+  muestra colapsada bajo "Inherited history", y solo lo que vino después cuenta
+  para los mensajes, la duración y la fecha de inicio. En la tabla la sesión
+  lleva un chip `branch`.
+- **Cambios de directorio.** Cuando la sesión pasa a otro directorio (un `cd`
+  que queda, `/cd`, un worktree) la transcripción muestra ahí `→ /ruta/nueva`, y
+  `-p` también encuentra la sesión por cualquiera de los directorios donde trabajó.
 - **Duración** es tiempo activo: los intervalos entre mensajes, sin las pausas
   de más de 30 minutos. Una sesión retomada a lo largo de varios días no cuenta
   los días del medio.
@@ -348,11 +356,13 @@ Cada sesión de `s`:
 | `e` | `true` si la sesión no tiene mensajes. |
 | `i` | `true` si `p` se dedujo de otra sesión del mismo proyecto. |
 | `f` / `l` | Timestamp del primer y del último evento (ISO 8601). |
-| `d` | Minutos activos (sin las pausas de más de 30 minutos). |
-| `u` / `a` | Cantidad de mensajes tuyos / de Claude. |
+| `d` | Minutos activos (sin las pausas de más de 30 minutos). En una rama, solo su parte propia. |
+| `u` / `a` | Cantidad de mensajes tuyos / de Claude. En una rama, solo su parte propia. |
 | `k` | Tamaño del archivo en KB. |
 | `v` | Versión de Claude Code. |
-| `c` | Transcripción: `[{"r": "u"｜"a"｜"t"｜"c", "x": texto}]`; `t` es una llamada a herramienta, `c` un resumen de compactación. |
+| `c` | Transcripción: `[{"r": "u"｜"a"｜"t"｜"c"｜"d", "x": texto}]`; `t` es una llamada a herramienta, `c` un resumen de compactación, `d` un cambio de directorio de trabajo. |
+| `h` | Cuántos bloques al principio de `c` se heredaron de la sesión de la que salió esta rama (0 si no es una rama). |
+| `o` / `ot` | Id y título de esa sesión (`null` si no es una rama; `ot` también si ya no está en disco). |
 
 Cada memoria de `m`:
 

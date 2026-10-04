@@ -127,6 +127,24 @@ func TestCompactionBlock(t *testing.T) {
 	}
 }
 
+func TestBranchAndDirectoryChange(t *testing.T) {
+	h := newHarness(t, nil)
+	branch := strings.Replace(session, `"c":[`, `"h":1,"o":"bbbbbbbb-0000","ot":"The original",`+
+		`"c":[{"r":"u","x":"old question"},{"r":"d","x":"/home/u/proj/sub"},`, 1)
+	r := h.create(`{"payload":` + payload(branch) + `}`)
+	txt := h.do("GET", "/share/"+r.ID+".txt", "", "").Body.String()
+	for _, want := range []string{"--- inherited history, from The original ---\n\n## User\n\nold question",
+		"--- the branch starts here ---\n\n> cd: /home/u/proj/sub\n"} {
+		if !strings.Contains(txt, want) {
+			t.Fatalf("missing %q in txt: %s", want, txt)
+		}
+	}
+	js := h.do("GET", "/share/"+r.ID+".json", "", "").Body.String()
+	if !strings.Contains(js, `"h":1,"o":"bbbbbbbb-0000","ot":"The original"`) {
+		t.Fatalf("json: %s", js)
+	}
+}
+
 func TestUpdateAndDeleteNeedTheSecret(t *testing.T) {
 	h := newHarness(t, nil)
 	r := h.create(`{"payload":` + payload() + `}`)
@@ -187,6 +205,8 @@ func TestRejectsBadPayloads(t *testing.T) {
 		"two sessions": `{"payload":` + payload(session, session) + `}`,
 		"bad role":     `{"payload":` + payload(strings.Replace(session, `"r":"t"`, `"r":"z"`, 1)) + `}`,
 		"bad type":     `{"payload":` + payload(strings.Replace(session, `"u":1`, `"u":"1"`, 1)) + `}`,
+		"h too big":    `{"payload":` + payload(strings.Replace(session, `"c":[`, `"h":9,"c":[`, 1)) + `}`,
+		"bad origin":   `{"payload":` + payload(strings.Replace(session, `"c":[`, `"o":"../x","c":[`, 1)) + `}`,
 		"memories":     `{"payload":{"s":[` + session + `],"m":[{"name":"x"}]}}`,
 		"bad expire":   `{"payload":` + payload() + `,"expire":"never"}`,
 		"extra field":  `{"payload":` + payload() + `,"html":"x"}`,
